@@ -66,7 +66,7 @@ function mountSheet(i,before){
     <button class="wk-toggle" type="button" aria-label="Mostra o nascondi la settimana">Settimana ${isoWeek(d)}<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M6 9l6 6 6-6"/></svg></button>
     <div class="week">${week}</div>
     <div class="carry" hidden></div>
-    <div class="slots">${HOURS.map(h=>`<div class="row${isToday&&h===nowH?' now':''}" data-h="${h}"><span class="hr">${String(h).padStart(2,'0')}:00</span><textarea class="t" data-h="${h}" rows="1" spellcheck="false" aria-label="Ore ${h}"></textarea></div>`).join('')}</div>
+    <div class="slots">${HOURS.map(h=>`<div class="row${isToday&&h===nowH?' now':''}" data-h="${h}"><span class="hr">${String(h).padStart(2,'0')}:00</span><textarea class="t" data-h="${h}" rows="1" spellcheck="false" aria-label="Ore ${h}"></textarea><span class="bell" hidden></span></div>`).join('')}</div>
     <div class="notes"><div class="nl">Note</div><textarea class="t" data-h="n" spellcheck="false" aria-label="Note"></textarea></div>
     <div class="photos"></div><canvas class="ink"></canvas><canvas class="live"></canvas><div class="fold"></div><div class="ribbon" hidden></div><div class="shade"></div></div>
     <div class="face back"><div class="shade"></div></div>`;
@@ -75,7 +75,7 @@ function mountSheet(i,before){
   const sh={el,front,idx:i,key:k,data:dataFor(k),canvas:el.querySelector('canvas.ink'),live:el.querySelector('canvas.live'),tas:[...el.querySelectorAll('textarea')],
     shF:front.querySelector('.shade'),shB:el.querySelector('.back .shade'),color:[bg,fg]};
   sh.tas.forEach(ta=>{const h=ta.dataset.h; ta.value=h==='n'?sh.data.n:(sh.data.h[h]||'');
-    ta.addEventListener('input',()=>{ if(h==='n') sh.data.n=ta.value; else { if(ta.value) sh.data.h[h]=ta.value; else delete sh.data.h[h] } grow(ta); commit(sh)})});
+    ta.addEventListener('input',()=>{ if(h==='n') sh.data.n=ta.value; else { if(ta.value) sh.data.h[h]=ta.value; else delete sh.data.h[h]; bellFor(sh,h) } grow(ta); commit(sh)})});
   el.querySelectorAll('.chip').forEach(c=>c.addEventListener('click',()=>goTo(+c.dataset.i)));
   el.querySelector('.wk-toggle').addEventListener('click',()=>{const on=book.classList.toggle('week-open');
     el.querySelector('.wk-toggle').setAttribute('aria-expanded',on); try{localStorage.setItem(KEY+'-week',on?'1':'0')}catch(e){}});
@@ -363,6 +363,19 @@ Richiesta: ${JSON.stringify(src)}`;
 }
 
 // ---- Scrittura nell'agenda ----
+const NUMA={un:1,una:1,"un'":1,due:2,tre:3,quattro:4,cinque:5,sei:6,dieci:10,quindici:15,venti:20,trenta:30,quaranta:40,quarantacinque:45};
+function cutAlert(src){
+  const m=src.match(/[,;]?\s*\b(?:e\s+)?(?:avvisami|avvisarmi|ricordamelo|ricordarmelo|ricordamela|mandami\s+(?:un\s+|una\s+)?(?:avviso|notifica|promemoria)|(?:con|metti(?:mi)?)\s+(?:un\s+|una\s+)?(?:avviso|promemoria|allarme|notifica|sveglia))\b/i);
+  if(!m) return {src,al:undefined};
+  let tail=src.slice(m.index+m[0].length), al, used=0, x;
+  if((x=tail.match(/^\s*(?:di\s+)?(?:una\s+)?mezz['’]?\s*ora(?:\s+prima)?/i))){al=30; used=x[0].length}
+  else if((x=tail.match(/^\s*(?:di\s+)?(\d+|un['’]?|una|due|tre|quattro|cinque|sei|dieci|quindici|venti|trenta|quaranta|quarantacinque)\s*(minut[oi]|or[ae]|giorn[oi])(?:\s+prima)?/i))){
+    const n=isNaN(x[1])?(NUMA[x[1].toLowerCase().replace('’',"'")]||1):+x[1]; const u=/^or/i.test(x[2])?60:/^giorn/i.test(x[2])?1440:1; al=n*u; used=x[0].length}
+  else if((x=tail.match(/^\s*il\s+giorno\s+prima/i))){al=1440; used=x[0].length}
+  else if((x=tail.match(/^\s*(?:all['’]?\s*ora\s+esatta|quando\s+inizia|in\s+tempo)/i))){al=0; used=x[0].length}
+  else {x=tail.match(/^\s*prima/i); used=x?x[0].length:0; al=pref.remind>0?pref.remind:60}
+  return {src:(src.slice(0,m.index)+' '+tail.slice(used)).replace(/\s+/g,' ').trim(),al};
+}
 function addEntry(p){
   const k=keyOf(p.date), slot=(p.hour!==null&&p.hour>=H0&&p.hour<=H1)?String(p.hour):'n';
   const time=p.hour!==null?`${String(p.hour).padStart(2,'0')}:${String(p.minute||0).padStart(2,'0')} `:'';
@@ -372,17 +385,19 @@ function addEntry(p){
   const prev=slot==='n'?data.n:(data.h[slot]||'');
   const next=prev?prev.replace(/\s+$/,'')+'\n'+line:line;
   if(slot==='n') data.n=next; else data.h[slot]=next;
+  if(p.al!==undefined&&slot!=='n'){data.al=data.al||{}; data.al[slot]=p.al}
   store[k]=data; save(k);
   const hist={text:p.text,when:'',restore:(quiet)=>{setSlot(k,slot,prev); const i=voiceHist.indexOf(hist); if(i>=0) voiceHist.splice(i,1); if(!quiet) toast('Appunto rimosso',null,2500)}};
   const restore=()=>hist.restore(false);
   const show=()=>{ if(!cur||cur.key!==k) return; const ta=cur.tas.find(t=>t.dataset.h===slot); ta.value=slot==='n'?data.n:(data.h[slot]||''); grow(ta);
-    const row=ta.closest('.row')||ta.closest('.notes'); row.classList.remove('flash'); void row.offsetWidth; row.classList.add('flash');
+    const row=ta.closest('.row')||ta.closest('.notes'); row.classList.remove('flash'); void row.offsetWidth; row.classList.add('flash'); if(slot!=='n') bellFor(cur,slot);
     const sr=stage.getBoundingClientRect(), rr=row.getBoundingClientRect(); stage.scrollTop+=rr.top-sr.top-sr.height*.3};
   const ti=idxOf(p.date);
   if(sameCur) show(); else if(!flip){goTo(ti); setTimeout(show,(parseFloat(getComputedStyle(root).getPropertyValue('--dur'))||0)*1000+120)}
   const when=`${GG[p.date.getDay()]} ${p.date.getDate()} ${MM[p.date.getMonth()].toLowerCase()}${p.hour!==null?`, ore ${String(p.hour).padStart(2,'0')}:${String(p.minute||0).padStart(2,'0')}`:', nelle note'}`;
-  hist.when=when; voiceHist.push(hist); say(`Segnato: ${p.text}. ${when.replace(', nelle note',', nelle note del giorno')}`+(p.warn?'. '+p.warn:''));
-  toast(`<span>Segnato: ${esc(p.text)}<small>${esc(when)}${p.warn?' · '+esc(p.warn):''}</small></span>`,restore,p.warn?9000:6000);
+  const alTxt=p.al===undefined?'':slot==='n'?' · per l\'avviso serve un orario':(p.al?` · avviso ${remLabel(p.al)} prima`:" · avviso all'ora esatta");
+  hist.when=when+alTxt; voiceHist.push(hist); say(`Segnato: ${p.text}. ${when.replace(', nelle note',', nelle note del giorno')}`+(alTxt?'. '+alTxt.replace(' · ',''):'')+(p.warn?'. '+p.warn:''));
+  toast(`<span>Segnato: ${esc(p.text)}<small>${esc(when+alTxt)}${p.warn?' · '+esc(p.warn):''}</small></span>`,restore,p.warn?9000:6000);
 }
 function esc(s){return String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]))}
 
@@ -520,9 +535,11 @@ async function submitVoice(){
   const del=parseDelete(src);
   if(del){closeVoice(); deleteEntry(del); return}
   vgo.disabled=true; vgo.textContent='Sto segnando…';
-  let p=parseLocal(src);
-  if(!p.found){const c=await parseWithClaude(src); if(c) p=c}
-  const hasVerb=ADD_RE.test(src);
+  const ca=cutAlert(src); const clean=ca.src;
+  let p=parseLocal(clean);
+  if(!p.found){const c=await parseWithClaude(clean); if(c) p=c}
+  p.al=ca.al;
+  const hasVerb=ADD_RE.test(clean);
   if(!force&&!hasVerb&&!p.found&&p.hour===null){ notUnderstood(src); return }
   force=false; vforce.hidden=true; closeVoice(); addEntry(p);
 }
@@ -708,7 +725,7 @@ function afterNav(){renderSideTabs(); renderBmTab()}
 function decorate(sh){
   sh.front.classList.toggle('folded',!!sh.data.f);
   sh.front.querySelector('.ribbon').hidden=meta().bm!==sh.key;
-  sh.el.querySelectorAll('.row').forEach(r=>{const h=r.dataset.h; r.classList.toggle('done',!!(sh.data.d&&sh.data.d[h])); r.classList.toggle('moved',!!(sh.data.m&&sh.data.m[h]))});
+  sh.el.querySelectorAll('.row').forEach(r=>{const h=r.dataset.h; r.classList.toggle('done',!!(sh.data.d&&sh.data.d[h])); r.classList.toggle('moved',!!(sh.data.m&&sh.data.m[h])); bellFor(sh,h)});
   const banner=sh.el.querySelector('.carry');
   const items=sh.idx===0?pendingCarry():[];
   banner.hidden=!items.length;
@@ -736,13 +753,16 @@ function hitSpecial(e){
   if(!cur||!e.target.closest('.book')) return null;
   const fr=cur.front.getBoundingClientRect(), c=fr.width*.1;
   if(e.clientX>fr.right-c&&e.clientX<=fr.right&&e.clientY>=fr.top&&e.clientY<fr.top+c) return {t:'fold'};
-  const hr=document.elementsFromPoint(e.clientX,e.clientY).find(x=>x.classList&&x.classList.contains('hr'));
+  const els=document.elementsFromPoint(e.clientX,e.clientY);
+  const bl=els.find(x=>x.classList&&x.classList.contains('bell')&&!x.hidden); if(bl){const row=bl.closest('.row'); if(row&&cur.el.contains(row)) return {t:'bell',h:row.dataset.h,el:bl}}
+  const hr=els.find(x=>x.classList&&x.classList.contains('hr'));
   if(hr){const row=hr.closest('.row'); if(row&&cur.el.contains(row)) return {t:'hr',h:row.dataset.h}}
   return null}
 function doSpecial(sp){
   const sh=cur; if(!sh) return;
   if(sp.t==='fold'){sh.data.f=!sh.data.f; commit(sh); decorate(sh); try{navigator.vibrate&&navigator.vibrate(12)}catch(e){}
     toast(sh.data.f?'Angolo piegato: ritrovi la pagina nell\'Indice':'Angolo spiegato',null,2200); return}
+  if(sp.t==='bell'){openAlertMenu(sh,sp.h,sp.el); return}
   if(sp.t==='hr'){const h=sp.h; if(!(sh.data.h[h]||'').trim()){toast('Scrivi qualcosa in quest\'ora per poterla spuntare',null,2200); return}
     sh.data.d=sh.data.d||{}; if(sh.data.d[h]) delete sh.data.d[h]; else sh.data.d[h]=true; commit(sh); decorate(sh); try{navigator.vibrate&&navigator.vibrate(10)}catch(e){}}
 }
@@ -870,17 +890,48 @@ document.addEventListener('visibilitychange',()=>{ if(document.visibilityState==
 setInterval(()=>{ if(document.visibilityState==='visible') syncNow() },60000);
 
 // ---- Promemoria e notifiche ----
-function remLabel(m){return m>=60?(m===60?'1 ora':(m/60)+' ore'):m+' minuti'}
+function remLabel(m){return m>=1440?(m===1440?'1 giorno':(m/1440)+' giorni'):m>=60?(m===60?'1 ora':(m/60)+' ore'):m+' minuti'}
+// avviso del singolo impegno: -1 nessuno, 0 all'ora esatta, n minuti prima; se non impostato vale l'impostazione generale
+function alertFor(d,sl){const v=d.al&&d.al[sl]; if(v!==undefined&&v!==null) return v<0?null:v; return pref.remind>0?pref.remind:null}
+const AL_OPTS=[['def',''],[0,"All'ora esatta"],[10,'10 minuti prima'],[30,'30 minuti prima'],[60,'1 ora prima'],[120,'2 ore prima'],[1440,'Il giorno prima'],[-1,'Nessun avviso']];
+function alShort(m){return m===0?'ora':m>=1440?(m/1440)+'g':m>=60?(m/60)+'h':m+'′'}
+function bellFor(sh,h){
+  const row=sh.el.querySelector(`.row[data-h="${h}"]`); if(!row) return; const b=row.querySelector('.bell'); if(!b) return;
+  const has=!!(sh.data.h[h]||'').trim(); b.hidden=!has; if(!has) return;
+  const v=sh.data.al&&sh.data.al[h]; const custom=v!==undefined&&v!==null;
+  b.className='bell'+(custom?(v<0?' off':' on'):(pref.remind>0?' def':' none'));
+  b.innerHTML=(custom&&v<0?'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6 8a6 6 0 019.3-5M18 8c0 7 3 9 3 9H9M3 3l18 18M13.7 21a2 2 0 01-3.4 0M6 8.6V9c0 4-1.2 6.4-2.1 7.7"/></svg>'
+    :'<svg viewBox="0 0 24 24" fill="'+(custom?'currentColor':'none')+'" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8a6 6 0 10-12 0c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.7 21a2 2 0 01-3.4 0"/></svg>')
+    +(custom&&v>=0?`<i>${alShort(v)}</i>`:'');
+  b.setAttribute('aria-label',custom?(v<0?'Nessun avviso':'Avviso '+(v?remLabel(v)+' prima':"all'ora esatta")):'Avviso: come da impostazioni');
+}
+const alMenu=document.getElementById('alMenu');
+function openAlertMenu(sh,h,anchor){
+  const txt=(sh.data.h[h]||'').split('\n')[0], v=sh.data.al&&sh.data.al[h];
+  alMenu.innerHTML=`<p class="al-t">Avviso per <b>${esc(spokenLine(txt)||'questo impegno')}</b></p>`+AL_OPTS.map(([val,lab])=>{
+    const sel=val==='def'?(v===undefined||v===null):v===val;
+    const label=val==='def'?`Come da impostazioni (${pref.remind>0?remLabel(pref.remind)+' prima':'nessun avviso'})`:lab;
+    return `<button data-al="${val}" aria-pressed="${sel}">${label}</button>`}).join('');
+  alMenu.hidden=false;
+  const r=anchor.getBoundingClientRect(), mw=alMenu.offsetWidth, mh=alMenu.offsetHeight, vw=innerWidth, vh=innerHeight;
+  alMenu.style.left=Math.max(12,Math.min(vw-mw-12,r.right-mw))+'px';
+  alMenu.style.top=(r.bottom+8+mh<vh-80?r.bottom+8:Math.max(12,r.top-mh-8))+'px';
+  alMenu.onclick=e=>{const b=e.target.closest('[data-al]'); if(!b) return; const val=b.dataset.al;
+    sh.data.al=sh.data.al||{}; if(val==='def') delete sh.data.al[h]; else sh.data.al[h]=+val; commit(sh); bellFor(sh,h); alMenu.hidden=true;
+    const eff=alertFor(sh.data,h);
+    toast(eff===null?'Nessun avviso per questo impegno':`Ti avviso ${eff?remLabel(eff)+' prima':"all'ora esatta"}`+((!user||Notification.permission!=='granted')?'<small>Per ricevere gli avvisi entra e attiva le notifiche in ⚙ Impostazioni</small>':''),null,3500)};
+}
+document.addEventListener('pointerdown',e=>{ if(!alMenu.hidden&&!e.target.closest('#alMenu')) alMenu.hidden=true },true);
 function futureKeys(){const t=keyOf(T0); return Object.keys(store).filter(k=>k!==META&&k>=t)}
 async function syncReminders(keys){
   if(!sb||!user||!keys.length) return; const now=Date.now();
   for(const k of keys){ const dt=keyDate(k); if(idxOf(dt)<-1) continue; const rows=[];
-    if(pref.remind>0){const d=store[k]||{};
-      for(const sl of Object.keys(d.h||{})){ if(d.d&&d.d[sl]) continue;
+    {const d=store[k]||{};
+      for(const sl of Object.keys(d.h||{})){ if(d.d&&d.d[sl]) continue; const mins=alertFor(d,sl); if(mins===null) continue;
         (d.h[sl]||'').split('\n').forEach(l=>{ if(!l.trim()) return; const m=l.match(/^\s*(\d{1,2})[:.](\d{2})\s+/); const hh=m?+m[1]:+sl, mm=m?+m[2]:0;
-          const at=new Date(dt.getFullYear(),dt.getMonth(),dt.getDate(),hh,mm), fire=new Date(at.getTime()-pref.remind*60000); if(fire.getTime()<=now) return;
+          const at=new Date(dt.getFullYear(),dt.getMonth(),dt.getDate(),hh,mm), fire=new Date(at.getTime()-mins*60000); if(fire.getTime()<=now) return;
           const hm=`${String(hh).padStart(2,'0')}:${String(mm).padStart(2,'0')}`;
-          rows.push({user_id:user.id,day:k,fire_at:fire.toISOString(),title:`${hm} · ${spokenLine(l)}`,body:`${GG[dt.getDay()]} ${dt.getDate()} ${MM[dt.getMonth()].toLowerCase()} · tra ${remLabel(pref.remind)}`}) }) } }
+          rows.push({user_id:user.id,day:k,fire_at:fire.toISOString(),title:`${hm} · ${spokenLine(l)}`,body:`${GG[dt.getDay()]} ${dt.getDate()} ${MM[dt.getMonth()].toLowerCase()} · ${mins?'tra '+remLabel(mins):'adesso'}`}) }) } }
     try{ await sb.from('reminders').delete().eq('day',k).is('sent_at',null); if(rows.length) await sb.from('reminders').insert(rows) }catch(e){} }
 }
 function b64u(s){const p='='.repeat((4-s.length%4)%4), b=atob((s+p).replace(/-/g,'+').replace(/_/g,'/')); return Uint8Array.from(b,c=>c.charCodeAt(0))}
@@ -908,7 +959,7 @@ pushBtn&&pushBtn.addEventListener('click',async()=>{
   }catch(e){toast('Non sono riuscito ad attivare le notifiche su questo telefono.',null,3500)}
   renderPush();
 });
-remSel&&remSel.addEventListener('change',()=>{pref.remind=+remSel.value; savePref(); syncReminders(futureKeys())});
+remSel&&remSel.addEventListener('change',()=>{pref.remind=+remSel.value; savePref(); syncReminders(futureKeys()); if(cur) decorate(cur)});
 if('serviceWorker' in navigator) navigator.serviceWorker.addEventListener('message',ev=>{const d=ev.data||{}; if(d.type==='goto'&&d.day){closeCover(true); goTo(idxOf(keyDate(d.day)))}});
 
 // ---- Impostazioni ----

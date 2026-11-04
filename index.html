@@ -116,7 +116,8 @@ body{background:var(--desk); color:var(--ui); font-family:var(--f-display); over
 .chip.today::after{content:""; position:absolute; bottom:3px; width:5px; height:5px; border-radius:50%; background:currentColor}
 
 .slots{position:relative; z-index:1; padding:0 calc(var(--pw)*.035) 0 0}
-.row{display:grid; grid-template-columns:calc(var(--pw)*.15) 1fr; border-top:1px solid var(--line)}
+.row{position:relative; display:grid; grid-template-columns:calc(var(--pw)*.15) 1fr; border-top:1px solid var(--line)}
+.row textarea.t{padding-right:calc(var(--pw)*.1)!important}
 .hr{align-self:start; justify-self:end; margin:calc(var(--pw)*.024) calc(var(--pw)*.03) 0 0; padding:3px 7px; border-radius:9px;
   font:600 calc(var(--pw)*.026)/1 var(--f-mono); color:var(--muted); font-variant-numeric:tabular-nums}
 .row.now .hr{background:var(--day); color:var(--day-ink)}
@@ -336,6 +337,24 @@ body.locked .mtabs, body.locked .bmtab{display:none!important}
 .cv-read svg{width:18px; height:18px}
 @media (prefers-reduced-motion: reduce){.cover-leaf{transition:opacity .2s}.cover.open .cover-leaf{transform:none}}
 
+/* Avviso del singolo impegno */
+.bell{position:absolute; right:calc(var(--pw)*.01); top:calc(var(--pw)*.018); display:flex; align-items:center; gap:2px; z-index:2; cursor:pointer;
+  padding:calc(var(--pw)*.01); border-radius:12px; color:var(--muted); font:700 calc(var(--pw)*.022)/1 var(--f-mono)}
+.bell svg{width:calc(var(--pw)*.042); height:calc(var(--pw)*.042); min-width:15px; min-height:15px}
+.bell.none{opacity:.28}.bell.def{opacity:.6}
+.bell.on{color:var(--day); background:color-mix(in srgb, var(--day) 14%, transparent); opacity:1}
+.bell.off{opacity:.45}
+.bell i{font-style:normal}
+body.locked .bell{display:none}
+.almenu{position:fixed; z-index:25; width:min(300px, calc(100% - 24px)); background:var(--dock); color:var(--ui); border:1px solid var(--ui-line); border-radius:18px;
+  padding:8px; display:grid; gap:2px; box-shadow:0 20px 50px -14px rgba(0,0,0,.5)}
+.almenu .al-t{margin:6px 10px 8px; font:400 13px/1.35 var(--f-display); color:var(--ui-dim)}
+.almenu .al-t b{color:var(--ui)}
+.almenu button{appearance:none; border:0; background:transparent; color:var(--ui); text-align:left; padding:11px 12px; border-radius:12px; font:500 14.5px/1.2 var(--f-display); cursor:pointer}
+.almenu button:hover{background:var(--ui-line)}
+.almenu button[aria-pressed="true"]{background:color-mix(in srgb, var(--day) 16%, transparent); font-weight:700}
+.almenu button[aria-pressed="true"]::after{content:" ✓"}
+
 /* Lucchetto: agenda a tutto schermo, nessun comando visibile */
 body.locked .top, body.locked .dock, body.locked .kit, body.locked .find, body.locked .wk-toggle, body.locked .week{display:none!important}
 body.locked textarea, body.locked canvas.ink{pointer-events:none}
@@ -431,6 +450,7 @@ body.locked .unlock.show{opacity:1; pointer-events:auto}
   </div>
 </div>
 
+<div class="almenu" id="alMenu" hidden role="menu" aria-label="Avviso per questo impegno"></div>
 <div class="toast" id="toast"><span id="toastMsg">Due dita per zoom e scorrimento · trascina dal bordo o di lato per sfogliare</span><button id="toastBtn" hidden>Annulla</button></div>
 
 <div class="scrim" id="vscrim" hidden>
@@ -455,7 +475,7 @@ body.locked .unlock.show{opacity:1; pointer-events:auto}
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.js"></script>
-<script src="/app.js?v=14"></script>
+<script src="/app.js?v=15"></script>
 
 <script>
 if('serviceWorker' in navigator){addEventListener('load',()=>navigator.serviceWorker.register('/sw.js').catch(()=>{}))}
