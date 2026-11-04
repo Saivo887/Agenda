@@ -10,7 +10,7 @@ const KEY='agenda-sfogliabile-v2';
 
 const book=document.getElementById('book'), stage=document.getElementById('stage'), root=document.documentElement;
 const T0=new Date(); T0.setHours(0,0,0,0);
-let idx=0, cur=null, flip=null, mode='pen', penSeen=false, zoom=1, lastW=0, locked=false, longT=0;
+let idx=0, cur=null, flip=null, mode='type', penSeen=false, zoom=1, lastW=0, locked=false, longT=0;
 const TOOLS={pen:{n:'Penna',sizes:[.0026,.0045,.0075]},pencil:{n:'Matita',sizes:[.003,.005,.0085]},marker:{n:'Pennarello',sizes:[.009,.015,.024]},hl:{n:'Evidenziatore',sizes:[.028,.042,.06]}};
 const PALETTE=['1','2','3','#0b7a5a','#13a47f','#7cc242','#f2b01e','#ff8a00','#e8382f','#d63c86','#9b51e0','#5b6cff','#00a3c4','#8a5a3c','#6b7280','#000000','#ffffff'];
 const PNAMES={'1':'Blu','2':'Inchiostro','3':'Rosso','#0b7a5a':'Verde bosco','#13a47f':'Verde','#7cc242':'Lime','#f2b01e':'Giallo','#ff8a00':'Arancio','#e8382f':'Rosso vivo','#d63c86':'Fucsia','#9b51e0':'Viola','#5b6cff':'Indaco','#00a3c4':'Azzurro','#8a5a3c':'Marrone','#6b7280':'Grigio','#000000':'Nero','#ffffff':'Bianco'};
@@ -559,7 +559,7 @@ kit.addEventListener('click',e=>{
 kit.addEventListener('input',e=>{ if(e.target.id==='cpick'){pref.color=e.target.value; savePref(); root.style.setProperty('--kit-c',pref.color); if(mode!=='pen') setMode('pen')} });
 kit.addEventListener('change',e=>{ if(e.target.id==='cpick') renderKit() });
 document.addEventListener('pointerdown',e=>{ if(!kit.hidden&&!e.target.closest('#kit,#kitBtn')) closeKit() });
-renderKit(); document.getElementById('m-pen').dataset.was='pen';
+renderKit(); document.getElementById('m-pen').dataset.was='';
 
 // ---- Suono delle pagine ----
 let actx=null;
