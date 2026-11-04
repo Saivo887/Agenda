@@ -1,0 +1,247 @@
+<!doctype html>
+<html lang="it">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
+<title>Agenda</title>
+<meta name="description" content="Agenda giornaliera da sfogliare, con scrittura a mano, tastiera e appunti a voce.">
+<meta name="theme-color" content="#14171c">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Agenda">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<link rel="manifest" href="/manifest.webmanifest">
+<link rel="icon" type="image/png" href="/icon-192.png">
+<link rel="apple-touch-icon" href="/apple-touch-icon.png">
+<style>
+:root{color-scheme:light; padding-top:env(safe-area-inset-top,0px); padding-bottom:env(safe-area-inset-bottom,0px); box-sizing:border-box; height:100%}
+*,*::before,*::after{box-sizing:border-box}
+body{margin:0; font:14px/1.4 system-ui,-apple-system,sans-serif; -webkit-tap-highlight-color:transparent; overscroll-behavior:none}
+img{max-width:100%}
+[hidden]{display:none!important}
+</style>
+</head>
+<body>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,400;12..96,600;12..96,800&family=Patrick+Hand&family=JetBrains+Mono:wght@400;600&display=swap">
+<style>
+/* Layout: scrivania scura con alone del colore del giorno; foglio bianco che si allunga; dock strumenti fluttuante in basso */
+@property --day{syntax:'<color>'; inherits:true; initial-value:#13a47f}
+:root{
+  --day:#13a47f; --day-ink:#ffffff;
+  --desk:#e7e9ee; --desk-2:#d5d9e1; --ui:#14171c; --ui-dim:#5d6572; --ui-line:rgba(20,23,28,.12); --dock:#ffffff;
+  --paper:#ffffff; --paper-back:#f0f1f4; --dots:#d3d8e0; --line:#e6e9ee; --muted:#8a93a1; --text:#14171c;
+  --ink-1:#2350d8; --ink-2:#22262c; --ink-3:#e0362c;
+  --f-display:"Bricolage Grotesque", "Avenir Next", system-ui, sans-serif;
+  --f-hand:"Patrick Hand", "Segoe Print", "Bradley Hand", cursive;
+  --f-mono:"JetBrains Mono", ui-monospace, Menlo, monospace;
+  --dur:.42s;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --desk:#0c0e12; --desk-2:#07080b; --ui:#eef0f4; --ui-dim:#9099a6; --ui-line:rgba(238,240,244,.13); --dock:#1b1f26;
+  --paper:#171a20; --paper-back:#22262e; --dots:#2d323c; --line:#262b34; --muted:#7b8494; --text:#eef0f4;
+  --ink-1:#8fb0ff; --ink-2:#e8eaee; --ink-3:#ff8a7a; color-scheme:dark}}
+:root[data-theme="dark"]{
+  --desk:#0c0e12; --desk-2:#07080b; --ui:#eef0f4; --ui-dim:#9099a6; --ui-line:rgba(238,240,244,.13); --dock:#1b1f26;
+  --paper:#171a20; --paper-back:#22262e; --dots:#2d323c; --line:#262b34; --muted:#7b8494; --text:#eef0f4;
+  --ink-1:#8fb0ff; --ink-2:#e8eaee; --ink-3:#ff8a7a; color-scheme:dark}
+@media (prefers-reduced-motion: reduce){:root{--dur:0s}}
+
+html,body{height:100%}
+body{background:var(--desk); color:var(--ui); font-family:var(--f-display); overflow:hidden}
+.glow{position:fixed; inset:0; pointer-events:none; transition:--day .7s;
+  background:radial-gradient(70% 55% at 50% 0%, color-mix(in srgb, var(--day) 38%, transparent), transparent 70%),
+             radial-gradient(60% 50% at 100% 100%, color-mix(in srgb, var(--day) 18%, transparent), transparent 70%), var(--desk)}
+.app{position:relative; height:100%; display:grid; grid-template-rows:auto 1fr}
+
+/* Barra in alto */
+.top{display:flex; flex-wrap:wrap; justify-content:space-between; align-items:center; gap:8px;
+  padding-block:10px 4px; padding-left:max(16px, env(safe-area-inset-left,0px)); padding-right:max(16px, env(safe-area-inset-right,0px)); z-index:5}
+.pill{display:flex; align-items:center; gap:2px; padding:3px; border-radius:22px; background:color-mix(in srgb, var(--dock) 80%, transparent);
+  border:1px solid var(--ui-line); backdrop-filter:blur(12px); -webkit-backdrop-filter:blur(12px)}
+.ib{appearance:none; border:0; background:transparent; color:var(--ui); height:34px; min-width:34px; padding:0 9px; border-radius:17px;
+  font:600 13px/1 var(--f-display); display:inline-flex; align-items:center; justify-content:center; gap:6px; cursor:pointer; touch-action:manipulation}
+.ib:hover{background:var(--ui-line)}
+.ib:focus-visible,.datebtn:focus-within,.chip:focus-visible{outline:2px solid var(--day); outline-offset:2px}
+.ib svg{width:18px; height:18px; flex:none}
+.datebtn{position:relative; height:34px; padding:0 10px; display:inline-flex; align-items:center; gap:8px; border-radius:17px; cursor:pointer;
+  font:600 14px/1 var(--f-display); white-space:nowrap}
+.datebtn i{width:9px; height:9px; border-radius:50%; background:var(--day); transition:--day .7s}
+.datebtn input{position:absolute; inset:0; opacity:0; width:100%; height:100%; border:0; cursor:pointer}
+.zl{font:600 12px/1 var(--f-mono); min-width:44px; text-align:center; color:var(--ui-dim); font-variant-numeric:tabular-nums}
+
+/* Area di lavoro scorrevole */
+.stage{position:relative; overflow:auto; touch-action:none; overscroll-behavior:contain;
+  padding-block:14px calc(120px + env(safe-area-inset-bottom,0px)); padding-left:max(16px, env(safe-area-inset-left,0px)); padding-right:max(16px, env(safe-area-inset-right,0px))}
+.book{position:relative; margin-inline:auto; perspective:2600px; user-select:none; -webkit-user-select:none; transform-origin:0 0}
+.sheet{position:absolute; left:0; top:0; width:100%; transform-origin:left top; transform-style:preserve-3d}
+.sheet.anim{transition:transform var(--dur) cubic-bezier(.2,.75,.25,1)}
+.face{backface-visibility:hidden; -webkit-backface-visibility:hidden; border-radius:6px 22px 22px 6px; overflow:hidden}
+.front{position:relative; background-color:var(--paper); color:var(--text);
+  box-shadow:0 1px 0 var(--ui-line), 0 24px 60px -18px rgba(0,0,0,.45)}
+.back{position:absolute; inset:0; transform:rotateY(180deg); background:var(--paper-back)}
+.shade{position:absolute; inset:0; pointer-events:none; opacity:0; z-index:8; background:linear-gradient(to left, rgba(0,0,0,.5), rgba(0,0,0,.12))}
+
+.band{position:relative; z-index:4; display:grid; grid-template-columns:auto 1fr auto; align-items:center; gap:calc(var(--pw)*.035);
+  margin:calc(var(--pw)*.025); padding:calc(var(--pw)*.045) calc(var(--pw)*.05); border-radius:calc(var(--pw)*.04);
+  background:var(--day); color:var(--day-ink); overflow:hidden}
+.band::after{content:""; position:absolute; right:-12%; top:-60%; width:55%; aspect-ratio:1; border-radius:50%; background:currentColor; opacity:.08; pointer-events:none}
+.bnum{font:800 calc(var(--pw)*.2)/.82 var(--f-display); letter-spacing:-.05em; font-variant-numeric:tabular-nums}
+.bdow{font:800 calc(var(--pw)*.062)/1 var(--f-display); letter-spacing:-.02em}
+.bmon{font:600 calc(var(--pw)*.026)/1.6 var(--f-mono); letter-spacing:.12em; text-transform:uppercase; opacity:.85}
+.bhol{display:inline-block; margin-top:4px; padding:2px 8px; border-radius:10px; background:color-mix(in srgb, currentColor 18%, transparent);
+  font:600 calc(var(--pw)*.024)/1.4 var(--f-mono); letter-spacing:.06em; text-transform:uppercase}
+.ring{position:relative; width:calc(var(--pw)*.15); aspect-ratio:1; max-width:100%}
+.ring svg{width:100%; height:100%; transform:rotate(-90deg)}
+.ring b{position:absolute; inset:0; display:grid; place-content:center; text-align:center; font:600 calc(var(--pw)*.024)/1.15 var(--f-mono); font-variant-numeric:tabular-nums}
+.ring b small{font-size:.75em; opacity:.8; font-weight:400}
+
+.wk-toggle{position:relative; z-index:4; display:flex; align-items:center; gap:6px; margin:0 calc(var(--pw)*.025) calc(var(--pw)*.02) auto;
+  appearance:none; border:1px solid var(--line); background:var(--paper); color:var(--muted); border-radius:14px; cursor:pointer;
+  padding:calc(var(--pw)*.01) calc(var(--pw)*.025); font:600 calc(var(--pw)*.024)/1 var(--f-mono); letter-spacing:.08em; text-transform:uppercase}
+.wk-toggle svg{width:1.2em; height:1.2em; transition:transform .25s}
+.week-open .wk-toggle svg{transform:rotate(180deg)}
+.wk-toggle:focus-visible{outline:2px solid var(--day); outline-offset:2px}
+.book:not(.week-open) .week{display:none}
+.week{position:relative; z-index:4; display:grid; grid-template-columns:repeat(7,1fr); gap:calc(var(--pw)*.012); padding:0 calc(var(--pw)*.025) calc(var(--pw)*.02)}
+.chip{appearance:none; border:1px solid var(--line); background:var(--paper); color:var(--text); border-radius:calc(var(--pw)*.025); cursor:pointer;
+  padding:calc(var(--pw)*.012) 0; display:grid; gap:2px; justify-items:center; position:relative}
+.chip span{font:400 calc(var(--pw)*.022)/1 var(--f-mono); color:var(--muted); text-transform:uppercase}
+.chip strong{font:800 calc(var(--pw)*.04)/1 var(--f-display); font-variant-numeric:tabular-nums}
+.chip.red strong{color:#e0362c}
+.chip.on{background:var(--day); border-color:var(--day); color:var(--day-ink)}
+.chip.on span,.chip.on.red strong{color:inherit}
+.chip.today::after{content:""; position:absolute; bottom:3px; width:5px; height:5px; border-radius:50%; background:currentColor}
+
+.slots{position:relative; z-index:1; padding:0 calc(var(--pw)*.035) 0 0}
+.row{display:grid; grid-template-columns:calc(var(--pw)*.15) 1fr; border-top:1px solid var(--line)}
+.hr{align-self:start; justify-self:end; margin:calc(var(--pw)*.026) calc(var(--pw)*.03) 0 0; padding:3px 7px; border-radius:9px;
+  font:600 calc(var(--pw)*.026)/1 var(--f-mono); color:var(--muted); font-variant-numeric:tabular-nums}
+.row.now .hr{background:var(--day); color:var(--day-ink)}
+.row.now{border-top-color:var(--day)}
+textarea.t{display:block; width:100%; min-height:calc(var(--pw)*.075); height:calc(var(--pw)*.075); border:0; outline:none; resize:none; overflow:hidden;
+  background:transparent; color:var(--ink-1); caret-color:var(--day); padding:0; margin:0;
+  font:400 calc(var(--pw)*.047)/calc(var(--pw)*.075) var(--f-hand)}
+textarea.t::placeholder{color:transparent}
+.row:focus-within{background:color-mix(in srgb, var(--day) 6%, transparent)}
+.notes{position:relative; z-index:1; margin:calc(var(--pw)*.03) calc(var(--pw)*.035) calc(var(--pw)*.05) calc(var(--pw)*.05);
+  padding-top:calc(var(--pw)*.02); border-top:2px solid var(--text)}
+.nl{font:600 calc(var(--pw)*.026)/1 var(--f-mono); letter-spacing:.14em; text-transform:uppercase; color:var(--muted); margin-bottom:6px}
+.notes textarea.t{min-height:calc(var(--pw)*.3)}
+canvas.ink{position:absolute; left:0; top:0; z-index:3; touch-action:none}
+
+.mode-type canvas.ink{pointer-events:none}
+.mode-pen textarea,.mode-erase textarea{pointer-events:none}
+.mode-pen canvas.ink{cursor:crosshair}
+.mode-erase canvas.ink{cursor:cell}
+
+/* Dock strumenti */
+.dock{position:fixed; left:50%; transform:translateX(-50%); bottom:calc(14px + env(safe-area-inset-bottom,0px)); z-index:10;
+  display:flex; align-items:center; gap:4px; padding:6px; border-radius:28px; max-width:calc(100% - 24px);
+  background:color-mix(in srgb, var(--dock) 86%, transparent); border:1px solid var(--ui-line);
+  backdrop-filter:blur(16px); -webkit-backdrop-filter:blur(16px); box-shadow:0 14px 40px -12px rgba(0,0,0,.4)}
+.tool{height:44px; min-width:44px; border-radius:22px; padding:0 12px}
+.tool[aria-pressed="true"]{background:var(--day); color:var(--day-ink)}
+.sw{width:26px; height:26px; border-radius:50%; border:0; padding:0; cursor:pointer; box-shadow:0 0 0 2px var(--dock) inset; transition:transform .15s}
+.sw[aria-pressed="true"]{box-shadow:0 0 0 2px var(--dock) inset, 0 0 0 2px var(--ui); transform:scale(1.1)}
+.sw:focus-visible{outline:2px solid var(--day); outline-offset:3px}
+.sep{width:1px; height:24px; background:var(--ui-line); margin:0 4px}
+@media (max-width:540px){.lbl{display:none}.tool{padding:0 10px}}
+
+.toast{position:fixed; left:50%; transform:translateX(-50%); bottom:calc(84px + env(safe-area-inset-bottom,0px)); z-index:11;
+  display:flex; align-items:center; gap:12px; width:max-content;
+  background:var(--ui); color:var(--desk); font:600 12.5px/1.35 var(--f-display); padding:9px 15px; border-radius:16px; max-width:calc(100% - 32px); text-align:left; transition:opacity .5s}
+.toast.hide{opacity:0; pointer-events:none}
+.toast button{appearance:none; border:0; background:transparent; color:var(--day); font:800 13px/1 var(--f-display); cursor:pointer; padding:6px 2px; white-space:nowrap}
+.toast small{display:block; font-weight:400; opacity:.75}
+
+.mic{background:var(--day); color:var(--day-ink); margin-left:2px}
+.mic:hover{background:var(--day); filter:brightness(1.08)}
+.row.flash{animation:flash 1.8s ease-out}
+@keyframes flash{0%,30%{background:color-mix(in srgb, var(--day) 28%, transparent)}100%{background:transparent}}
+
+/* Pannello appunto vocale */
+.scrim{position:fixed; inset:0; z-index:20; background:rgba(0,0,0,.35); display:flex; align-items:flex-end; justify-content:center;
+  padding-left:max(12px, env(safe-area-inset-left,0px)); padding-right:max(12px, env(safe-area-inset-right,0px)); padding-bottom:calc(12px + env(safe-area-inset-bottom,0px))}
+.vpanel{width:100%; max-width:520px; background:var(--dock); color:var(--ui); border:1px solid var(--ui-line); border-radius:26px;
+  padding:20px; display:grid; gap:14px; box-shadow:0 30px 70px -20px rgba(0,0,0,.6)}
+.vhead{display:flex; justify-content:space-between; align-items:center; gap:12px}
+.vhead h2{margin:0; font:800 20px/1.1 var(--f-display); letter-spacing:-.01em}
+.vrec{display:flex; align-items:center; gap:14px}
+.vbig{position:relative; flex:none; width:64px; height:64px; border-radius:50%; border:0; cursor:pointer; background:var(--day); color:var(--day-ink); display:grid; place-items:center}
+.vbig svg{width:28px; height:28px}
+.vbig.live::before{content:""; position:absolute; inset:-6px; border-radius:50%; border:3px solid var(--day); animation:pulse 1.2s ease-out infinite}
+@keyframes pulse{0%{opacity:.9; transform:scale(.92)}100%{opacity:0; transform:scale(1.25)}}
+@media (prefers-reduced-motion: reduce){.vbig.live::before{animation:none}.row.flash{animation:none}}
+.vstat{font:400 13.5px/1.4 var(--f-display); color:var(--ui-dim); min-width:0}
+.vstat b{color:var(--ui)}
+.vpanel textarea{width:100%; min-height:84px; resize:vertical; border:1px solid var(--ui-line); border-radius:16px; background:var(--desk); color:var(--ui);
+  padding:12px 14px; font:400 19px/1.35 var(--f-hand); outline:none; box-sizing:border-box}
+.vpanel textarea:focus{border-color:var(--day)}
+.vex{display:flex; flex-wrap:wrap; gap:6px}
+.vex button{appearance:none; border:1px solid var(--ui-line); background:transparent; color:var(--ui-dim); border-radius:14px; padding:6px 10px; font:400 12.5px/1.2 var(--f-display); cursor:pointer; text-align:left}
+.vex button:hover{color:var(--ui)}
+.vact{display:flex; justify-content:flex-end; gap:8px}
+.vgo{background:var(--day); color:var(--day-ink); padding:0 18px; height:42px; border-radius:21px}
+.vgo:hover{background:var(--day); filter:brightness(1.08)}
+.vgo:disabled{opacity:.5; cursor:default}
+</style>
+
+<div class="glow"></div>
+<div class="app">
+  <div class="top">
+    <div class="pill">
+      <button class="ib" id="prev" aria-label="Giorno precedente"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M15 5l-7 7 7 7"/></svg></button>
+      <label class="datebtn"><i></i><span id="dateTxt">—</span><input type="date" id="datePick" aria-label="Vai a una data"></label>
+      <button class="ib" id="next" aria-label="Giorno successivo"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M9 5l7 7-7 7"/></svg></button>
+      <button class="ib" id="today">Oggi</button>
+    </div>
+    <div class="pill">
+      <button class="ib" id="zout" aria-label="Riduci zoom"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M6 12h12"/></svg></button>
+      <button class="ib zl" id="zreset" title="Torna al 100%">100%</button>
+      <button class="ib" id="zin" aria-label="Aumenta zoom"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M6 12h12M12 6v12"/></svg></button>
+    </div>
+  </div>
+  <div class="stage" id="stage"><div class="book mode-pen" id="book"></div></div>
+</div>
+<div class="dock" role="toolbar" aria-label="Strumenti">
+  <button class="ib tool" id="m-pen" aria-pressed="true" title="Scrivi a mano"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linejoin="round"><path d="M4 20l1.2-4.6L16 4.6a2 2 0 012.8 0l.6.6a2 2 0 010 2.8L8.6 18.8z"/><path d="M14 6.5l3.5 3.5"/></svg><span class="lbl">Penna</span></button>
+  <button class="ib tool" id="m-type" aria-pressed="false" title="Scrivi con la tastiera"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"><rect x="3" y="6" width="18" height="12" rx="3"/><path d="M7 10h.01M11 10h.01M15 10h.01M8 14h8"/></svg><span class="lbl">Tastiera</span></button>
+  <button class="ib tool" id="m-erase" aria-pressed="false" title="Gomma"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linejoin="round"><path d="M8.5 19H20M4.8 14.6l8.8-8.8a2 2 0 012.8 0l2.8 2.8a2 2 0 010 2.8L12 18.6H8.8z"/><path d="M9.5 9.9l5.6 5.6"/></svg><span class="lbl">Gomma</span></button>
+  <span id="inks" style="display:flex;align-items:center;gap:8px">
+    <span class="sep"></span>
+    <button class="sw" data-c="1" aria-pressed="true" aria-label="Blu" style="background:var(--ink-1)"></button>
+    <button class="sw" data-c="2" aria-pressed="false" aria-label="Grafite" style="background:var(--ink-2)"></button>
+    <button class="sw" data-c="3" aria-pressed="false" aria-label="Rosso" style="background:var(--ink-3)"></button>
+  </span>
+  <span class="sep"></span>
+  <button class="ib tool" id="undo" title="Annulla"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M9 7L4 12l5 5"/><path d="M4 12h10a5 5 0 010 10h-3"/></svg></button>
+  <button class="ib tool mic" id="voice" title="Appunto vocale"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5.5 11a6.5 6.5 0 0013 0M12 17.5V21"/></svg><span class="lbl">Detta</span></button>
+</div>
+<div class="toast" id="toast"><span id="toastMsg">Due dita per zoom e scorrimento · trascina dal bordo o di lato per sfogliare</span><button id="toastBtn" hidden>Annulla</button></div>
+
+<div class="scrim" id="vscrim" hidden>
+  <div class="vpanel" role="dialog" aria-modal="true" aria-labelledby="vtitle">
+    <div class="vhead"><h2 id="vtitle">Appunto vocale</h2>
+      <button class="ib" id="vclose" aria-label="Chiudi"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg></button></div>
+    <div class="vrec">
+      <button class="vbig" id="vmic" aria-label="Inizia a dettare"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5.5 11a6.5 6.5 0 0013 0M12 17.5V21"/></svg></button>
+      <div class="vstat" id="vstat">Tocca il microfono e parla. Dì cosa, quando e a che ora.</div>
+    </div>
+    <textarea id="vtext" placeholder="Es. Segnami appuntamento dal dentista mercoledì 25 novembre ore 16"></textarea>
+    <div class="vex" id="vex">
+      <button>Dentista il 25 novembre alle 16</button>
+      <button>Domani alle 9 chiamare il fornitore</button>
+      <button>Ricordami venerdì alle 18:30 palestra</button>
+    </div>
+    <div class="vact"><button class="ib" id="vcancel">Annulla</button><button class="ib vgo" id="vgo" disabled>Segna in agenda</button></div>
+  </div>
+</div>
+
+<script src="/app.js"></script>
+
+<script>
+if('serviceWorker' in navigator){addEventListener('load',()=>navigator.serviceWorker.register('/sw.js').catch(()=>{}))}
+</script>
+</body>
+</html>
