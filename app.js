@@ -277,6 +277,13 @@ function toast(html,action,ms){toastMsg.innerHTML=html; toastBtn.hidden=!action;
   toastEl.classList.remove('hide'); clearTimeout(toastT); toastT=setTimeout(()=>toastEl.classList.add('hide'),ms||6000)}
 
 // ---- Interpretazione della frase ----
+const POLITE='(?:(?:ehi|ok|hey)\\s+agenda\\s*,?\\s*)?(?:per\\s+(?:favore|piacere)\\s*,?\\s*)?(?:(?:mi\\s+|me\\s+)?(?:puoi|potresti|riesci\\s+a|vorrei\\s+che|voglio\\s+che|devi)\\s+)?(?:mi\\s+|me\\s+|ti\\s+)?';
+const CLITIC='(?:mi|ti|ci|lo|la|le|li|ne|melo|mela|telo|celo|glielo)?';
+const ADDV='(?:aggiung|inser(?:isc)?|mett|scriv|ricord|segn|annot|appunt|fiss|prenot|programm|pianific|memorizz|salv|registr|cre|organizz)(?:are|ere|ire|ar|er|ir|ati|iamo|a|i|e|o)'+CLITIC;
+const ADDV2='(?:'+ADDV+'|not(?:are|ar|a)'+CLITIC+')';
+const DELV='(?:annull(?:are|ar|a|i)|cancell(?:are|ar|a|i)|elimin(?:are|ar|a|i)|togli(?:ere|er)?|rimuov(?:ere|er|i)|lev(?:are|ar|a)|scancell(?:are|ar|a)|disdic(?:ere|er|i)|butt(?:are|ar|a)\\s+via)'+CLITIC;
+const ADD_RE=new RegExp('^\\s*'+POLITE+ADDV2+'\\b\\s*(?:(?:in|nell\'|sull\'|all\')\\s*agenda\\b\\s*)?(?:(?:che|di)\\s+)?(?:(?:un|uno|una|un\'|il|lo|la|l\'|i|gli|le)\\s*)?','i');
+const DEL_RE=new RegExp('^\\s*'+POLITE+DELV+'\\b\\s*','i');
 const MREX='gennaio|febbraio|marzo|aprile|maggio|giugno|luglio|agosto|settembre|ottobre|novembre|dicembre';
 const WD=[['domenica'],['lunedì','lunedi'],['martedì','martedi'],['mercoledì','mercoledi'],['giovedì','giovedi'],['venerdì','venerdi'],['sabato']];
 const WREX=WD.flat().join('|');
@@ -315,7 +322,7 @@ function parseLocal(src){
   const pm=cut(/\b(?:del|di|nel)\s+(pomeriggio|sera)\b/i), am=cut(/\b(?:del|di|la)\s+mattin[ao]\b/i);
   if(hour!==null){ if(pm&&hour<12) hour+=12; else if(!am&&hour>=1&&hour<=6) hour+=12; if(hour>23||minute>59){hour=null; minute=null} }
   // testo
-  let t=s.replace(/^\s*(?:per\s+favore\s+)?(?:segnami|segna(?:re)?|ricordami(?:\s+di)?|ricorda|aggiungi|mettimi|metti|annota(?:mi)?|appunta(?:mi)?|scrivi|nota)\b\s*(?:che\s+)?(?:(?:un|uno|una|il|lo|la|l')\s*)?/i,' ');
+  let t=s.replace(ADD_RE,' ').replace(/\b(?:in|nell'|sull'|all')\s*agenda\b/gi,' ');
   t=t.replace(/\s+/g,' ').trim();
   for(let i=0;i<3;i++) t=t.replace(/^(?:per|il|lo|la|di|a|alle|ore|giorno|e|,)\s+/i,'').replace(/\s+(?:per|il|lo|la|di|a|alle|ore|giorno|e|,|del|nel)$/i,'').replace(/[,;:]+$/,'').trim();
   if(!t) t=src.trim();
@@ -330,7 +337,7 @@ async function parseWithClaude(src){
   const sample=await getSample(); if(!sample) return null;
   const d=T0, iso=keyOf(d);
   const prompt=`Oggi è ${GG[d.getDay()].toLowerCase()} ${iso}. Interpreta questa richiesta dettata a un'agenda in italiano.
-Rispondi solo con JSON: {"date":"YYYY-MM-DD","hour":numero 0-23 oppure null,"minute":numero 0-59 oppure null,"text":"l'appunto, breve, senza data né ora né parole come segnami o ricordami","note":"stringa vuota, oppure un avviso se la richiesta è ambigua o contraddittoria"}.
+Rispondi solo con JSON: {"date":"YYYY-MM-DD","hour":numero 0-23 oppure null,"minute":numero 0-59 oppure null,"text":"l'appunto, breve, senza data né ora né verbi di comando come segnami, aggiungimi, ricordami, mettimi","note":"stringa vuota, oppure un avviso se la richiesta è ambigua o contraddittoria"}.
 Se non c'è una data usa oggi. "Alle 4" per un appuntamento significa 16.
 Richiesta: ${JSON.stringify(src)}`;
   try{const r=await sample.json(prompt,{modelTier:'quick'});
@@ -351,17 +358,59 @@ function addEntry(p){
   const next=prev?prev.replace(/\s+$/,'')+'\n'+line:line;
   if(slot==='n') data.n=next; else data.h[slot]=next;
   store[k]=data; save();
-  const restore=()=>{const dd=(cur&&cur.key===k)?cur.data:store[k]; if(slot==='n') dd.n=prev; else if(prev) dd.h[slot]=prev; else delete dd.h[slot];
-    store[k]=dd; save(); if(cur&&cur.key===k){const ta=cur.tas.find(t=>t.dataset.h===slot); ta.value=prev; grow(ta)} toast('Appunto rimosso',null,2500)};
+  const hist={text:p.text,when:'',restore:(quiet)=>{setSlot(k,slot,prev); const i=voiceHist.indexOf(hist); if(i>=0) voiceHist.splice(i,1); if(!quiet) toast('Appunto rimosso',null,2500)}};
+  const restore=()=>hist.restore(false);
   const show=()=>{ if(!cur||cur.key!==k) return; const ta=cur.tas.find(t=>t.dataset.h===slot); ta.value=slot==='n'?data.n:(data.h[slot]||''); grow(ta);
     const row=ta.closest('.row')||ta.closest('.notes'); row.classList.remove('flash'); void row.offsetWidth; row.classList.add('flash');
     const sr=stage.getBoundingClientRect(), rr=row.getBoundingClientRect(); stage.scrollTop+=rr.top-sr.top-sr.height*.3};
   const ti=idxOf(p.date);
   if(sameCur) show(); else if(!flip){goTo(ti); setTimeout(show,(parseFloat(getComputedStyle(root).getPropertyValue('--dur'))||0)*1000+120)}
   const when=`${GG[p.date.getDay()]} ${p.date.getDate()} ${MM[p.date.getMonth()].toLowerCase()}${p.hour!==null?`, ore ${String(p.hour).padStart(2,'0')}:${String(p.minute||0).padStart(2,'0')}`:', nelle note'}`;
+  hist.when=when; voiceHist.push(hist);
   toast(`<span>Segnato: ${esc(p.text)}<small>${esc(when)}${p.warn?' · '+esc(p.warn):''}</small></span>`,restore,p.warn?9000:6000);
 }
 function esc(s){return String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]))}
+
+// ---- Cancellazione a voce ----
+const voiceHist=[];
+function parseDelete(src){
+  const m=src.match(DEL_RE); if(!m) return null;
+  let rest=src.slice(m[0].length).replace(/[.!?]+$/,'').trim();
+  rest=rest.replace(/^(?:(?:l'|lo|la|il|un|una|i|gli|le)\s*)/i,'').trim();
+  if(!rest||/^(?:ultim[oaei]|quell[oa]\s+di\s+prima|appena\s+(?:dett|scritt)[oa]|precedente|ultim[oa]\s+(?:appunto|nota|cosa|impegno|inserimento|comando))(?:\s+(?:appunto|nota|cosa|impegno|inserimento|comando))?$/i.test(rest)) return {last:true};
+  return {last:false,query:rest};
+}
+const STOP=new Set(['appuntamento','appuntamenti','impegno','nota','appunto','evento','con','del','dal','della','dalla','alle','per','che','una','uno','gli','dei','delle','di','da','il','la','lo','le','al','ore']);
+function deleteEntry(d){
+  if(d.last){
+    const h=voiceHist.pop();
+    if(!h){toast('Non c\'è nessun appunto dettato da annullare',null,3500); return}
+    h.restore(true); toast(`<span>Cancellato: ${esc(h.text)}<small>${esc(h.when)}</small></span>`,null,4000); return}
+  // cerca la data, se c'è, e le parole dell'appunto
+  const p=parseLocal(d.query); const words=p.text.toLowerCase().split(/[^a-zà-ù0-9]+/).filter(w=>w.length>2&&!STOP.has(w));
+  if(!words.length){toast('Dimmi cosa cancellare, ad esempio: cancella dentista',null,4000); return}
+  const keys=p.found?[keyOf(p.date)]:Object.keys(store).sort((a,b)=>{const t=keyOf(T0), fa=a>=t, fb=b>=t; return fa!==fb?(fa?-1:1):(fa?a.localeCompare(b):b.localeCompare(a))});
+  for(const k of keys){const dd=store[k]; if(!dd) continue;
+    const slots=[...Object.keys(dd.h||{}).sort((a,b)=>a-b),'n'];
+    for(const sl of slots){const txt=sl==='n'?(dd.n||''):(dd.h[sl]||''); const lines=txt.split('\n');
+      const li=lines.findIndex(l=>{const low=l.toLowerCase(); return words.every(w=>low.includes(w))});
+      if(li<0) continue;
+      const removed=lines[li]; lines.splice(li,1); const next=lines.join('\n').trim();
+      setSlot(k,sl,next);
+      const [y,mo,da]=k.split('-').map(Number), dt=new Date(y,mo-1,da);
+      const where=`${GG[dt.getDay()]} ${dt.getDate()} ${MM[dt.getMonth()].toLowerCase()}${sl==='n'?', note':', ore '+String(sl).padStart(2,'0')}`;
+      if(idxOf(dt)!==idx&&!flip) goTo(idxOf(dt));
+      toast(`<span>Cancellato: ${esc(removed.trim())}<small>${esc(where)}</small></span>`,()=>{setSlot(k,sl,txt); toast('Ripristinato',null,2000)},6000);
+      return}
+  }
+  toast(`<span>Non ho trovato «${esc(p.text)}»<small>${p.found?'in quel giorno':'in agenda'}</small></span>`,null,4500);
+}
+function setSlot(k,sl,val){
+  const data=(cur&&cur.key===k)?cur.data:(store[k]||(store[k]={h:{},n:'',s:[]}));
+  data.h=data.h||{}; if(sl==='n') data.n=val; else if(val) data.h[sl]=val; else delete data.h[sl];
+  store[k]=data; save();
+  if(cur&&cur.key===k){const ta=cur.tas.find(t=>t.dataset.h===String(sl)); if(ta){ta.value=sl==='n'?data.n:(data.h[sl]||''); grow(ta)}}
+}
 
 // ---- Pannello vocale ----
 const vscrim=document.getElementById('vscrim'), vtext=document.getElementById('vtext'), vstat=document.getElementById('vstat'), vmic=document.getElementById('vmic'), vgo=document.getElementById('vgo');
@@ -388,6 +437,8 @@ function startRec(){
 function stopRec(){ if(rec&&recOn){try{rec.stop()}catch(e){}} }
 async function submitVoice(){
   const src=vtext.value.trim(); if(!src) return; stopRec();
+  const del=parseDelete(src);
+  if(del){closeVoice(); deleteEntry(del); return}
   vgo.disabled=true; vgo.textContent='Sto segnando…';
   let p=parseLocal(src);
   if(!p.found){vstat.textContent='Sto capendo la data…'; const c=await parseWithClaude(src); if(c) p=c}

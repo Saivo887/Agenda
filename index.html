@@ -271,12 +271,14 @@ body.locked .unlock.show{opacity:1; pointer-events:auto}
       <button>Dentista il 25 novembre alle 16</button>
       <button>Domani alle 9 chiamare il fornitore</button>
       <button>Ricordami venerdì alle 18:30 palestra</button>
+      <button>Cancella l'ultimo appunto</button>
+      <button>Cancella dentista</button>
     </div>
     <div class="vact"><button class="ib" id="vcancel">Annulla</button><button class="ib vgo" id="vgo" disabled>Segna in agenda</button></div>
   </div>
 </div>
 
-<script src="/app.js?v=5"></script>
+<script src="/app.js?v=6"></script>
 
 <script>
 if('serviceWorker' in navigator){addEventListener('load',()=>navigator.serviceWorker.register('/sw.js').catch(()=>{}))}
