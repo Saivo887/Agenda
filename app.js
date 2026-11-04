@@ -122,7 +122,6 @@ function stageInner(){const cs=getComputedStyle(stage); return stage.clientWidth
 function layout(){
   const W=Math.round(Math.min(stageInner(),600)*zoom);
   book.style.width=W+'px'; book.style.setProperty('--pw',W+'px');
-  document.getElementById('zreset').textContent=Math.round(zoom*100)+'%';
   book.querySelectorAll('.sheet').forEach(()=>{}); if(cur) refresh(cur); if(flip){refresh(flip.leaf===cur?flip.under:flip.leaf)} fitBook();
 }
 function setZoom(z,cx,cy){
@@ -134,9 +133,6 @@ function setZoom(z,cx,cy){
 function stageCenter(){const r=stage.getBoundingClientRect(); return [r.left+r.width/2, r.top+r.height/3]}
 new ResizeObserver(()=>{const w=stage.clientWidth; if(w!==lastW){lastW=w; layout()}}).observe(stage);
 stage.addEventListener('wheel',e=>{ if(e.ctrlKey||e.metaKey){e.preventDefault(); setZoom(zoom*Math.exp(-e.deltaY*.01),e.clientX,e.clientY)} },{passive:false});
-document.getElementById('zin').onclick=()=>setZoom(zoom*1.25,...stageCenter());
-document.getElementById('zout').onclick=()=>setZoom(zoom/1.25,...stageCenter());
-document.getElementById('zreset').onclick=()=>setZoom(1,...stageCenter());
 
 // ---- Sfoglio ----
 function setP(p){flip.p=p; const ang=flip.dir>0?-180*p:-180*(1-p), a=Math.abs(ang);
