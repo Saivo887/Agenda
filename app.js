@@ -414,11 +414,15 @@ function setSlot(k,sl,val){
 
 // ---- Domande e ricerca ----
 const ASK_RE=/^\s*(?:(?:ehi|ok|hey)\s+agenda\s*,?\s*)?(?:(?:mi\s+)?(?:sai\s+dire|dici|puoi\s+dirmi|ricordi)\s+)?(?:quando|cerca(?:mi)?|trova(?:mi)?|ricerca|dov['’]?\s*è|dove|a\s+che\s+ora|che\s+giorno|in\s+che\s+giorno|che\s+cosa|cosa|mostra(?:mi)?|fammi\s+vedere|c['’]?\s*è|ci\s+sono|ho\s+(?:segnato|messo|scritto|annotato))\b/i;
-const QSTOP=new Set([...STOP,'ho','hai','ha','segnato','messo','scritto','annotato','quando','cosa','che','c','è','e','in','agenda','prossimo','prossima','mio','mia','miei','mie','a','ora','giorno','mi','ci','sono','un','l','prima','dopo','ancora','qualcosa','devo','fare','c\'è']);
+const QSTOP=new Set([...STOP,'dimmi','dimmelo','sai','dire','puoi','potresti','fammi','sapere','vedere','po','poco','favore','piacere','ehi','hey','ok','allora','senti','scusa','vorrei','voglio','controlla','guarda','ho','hai','ha','segnato','messo','scritto','annotato','quando','cosa','che','c','è','e','in','agenda','prossimo','prossima','mio','mia','miei','mie','a','ora','giorno','mi','ci','sono','un','l','prima','dopo','ancora','qualcosa','devo','fare','c\'è']);
 function norm(x){return String(x).toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,'')}
+const QW=/(?:^|[\s,])(?:quando|dov['’]?\s*è|dove|a\s+che\s+ora|in\s+che\s+giorno|che\s+giorno|cerca(?:mi)?|trova(?:mi)?|ricerca|ho\s+(?:segnato|messo|scritto|annotato)|che\s+(?:cosa\s+)?ho|cosa\s+ho|c['’]?\s*è|ci\s+sono)(?=[\s,?]|$)/i;
 function parseAsk(src){
-  const q=src.trim(); const m=q.match(ASK_RE); if(!m&&!/\?\s*$/.test(q)) return null;
-  const body=q.slice(m?m[0].length:0).replace(/\?+\s*$/,'');
+  const q=src.trim();
+  if(ADD_RE.test(q)||DEL_RE.test(q)) return null;
+  const m=q.match(ASK_RE)||(()=>{const x=q.match(QW); return x&&x.index<=45?x:null})();
+  if(!m&&!/\?\s*$/.test(q)) return null;
+  const body=q.slice(m?m.index+m[0].length:0).replace(/\?+\s*$/,'');
   const p=parseLocal(body);
   const words=norm(p.text).split(/[^a-z0-9]+/).filter(w=>w.length>1&&!QSTOP.has(w));
   return {words,label:words.join(' '),date:p.found?p.date:null};
@@ -474,7 +478,7 @@ document.getElementById('fClose').onclick=closeFind;
 const vscrim=document.getElementById('vscrim'), vtext=document.getElementById('vtext'), vstat=document.getElementById('vstat'), vmic=document.getElementById('vmic'), vgo=document.getElementById('vgo');
 const SR=window.SpeechRecognition||window.webkitSpeechRecognition; let rec=null, recOn=false, micBlocked=!SR;
 const HINT_KB='Il microfono diretto non è disponibile qui: tocca il <b>microfono della tastiera</b> del telefono e detta nel riquadro, poi premi <b>Segna in agenda</b>.';
-function openVoice(){vscrim.hidden=false; vtext.value=''; vgo.disabled=true; vgo.textContent='Segna in agenda';
+function openVoice(){vscrim.hidden=false; vtext.value=''; vgo.disabled=true; vgo.textContent='Segna in agenda'; vforce.hidden=true; force=false;
   vstat.innerHTML=micBlocked?HINT_KB:'Tocca il microfono e parla. Dì cosa, quando e a che ora.';
   if(micBlocked) setTimeout(()=>vtext.focus(),50); else startRec()}
 function closeVoice(){stopRec(); vscrim.hidden=true}
@@ -489,6 +493,7 @@ function startRec(){
   rec.onend=()=>{recOn=false; vmic.classList.remove('live'); vmic.setAttribute('aria-label','Inizia a dettare');
     if(!micBlocked&&vstat.textContent.startsWith('Ti ascolto')) vstat.textContent=vtext.value?'Controlla il testo e premi Segna in agenda.':'Tocca il microfono e parla.';
     if(finalTxt.trim()&&!vscrim.hidden) submitVoice()};
+  vforce.hidden=true;
   try{rec.start(); recOn=true; vmic.classList.add('live'); vmic.setAttribute('aria-label','Ferma'); vstat.textContent='Ti ascolto…'}
   catch(e){micBlocked=true; vstat.innerHTML=HINT_KB; vtext.focus()}
 }
@@ -501,9 +506,18 @@ async function submitVoice(){
   if(del){closeVoice(); deleteEntry(del); return}
   vgo.disabled=true; vgo.textContent='Sto segnando…';
   let p=parseLocal(src);
-  if(!p.found){vstat.textContent='Sto capendo la data…'; const c=await parseWithClaude(src); if(c) p=c}
-  closeVoice(); addEntry(p);
+  if(!p.found){const c=await parseWithClaude(src); if(c) p=c}
+  const hasVerb=ADD_RE.test(src);
+  if(!force&&!hasVerb&&!p.found&&p.hour===null){ notUnderstood(src); return }
+  force=false; vforce.hidden=true; closeVoice(); addEntry(p);
 }
+let force=false; const vforce=document.getElementById('vforce');
+function notUnderstood(src){
+  vgo.disabled=false; vgo.textContent='Segna in agenda'; vforce.hidden=false;
+  vstat.innerHTML=`Non ho capito «${esc(src)}». <b>Tocca il microfono e ripeti</b>, per esempio "segnami dentista il 25 novembre alle 16" o "quando ho il dentista?".`;
+  try{navigator.vibrate&&navigator.vibrate([20,60,20])}catch(e){}
+}
+vforce.onclick=()=>{force=true; submitVoice()};
 document.getElementById('voice').onclick=openVoice;
 document.getElementById('vclose').onclick=closeVoice;
 document.getElementById('vcancel').onclick=closeVoice;

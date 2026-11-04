@@ -182,7 +182,7 @@ canvas.live{position:absolute; left:0; top:0; z-index:3; pointer-events:none}
 .vex{display:flex; flex-wrap:wrap; gap:6px}
 .vex button{appearance:none; border:1px solid var(--ui-line); background:transparent; color:var(--ui-dim); border-radius:14px; padding:6px 10px; font:400 12.5px/1.2 var(--f-display); cursor:pointer; text-align:left}
 .vex button:hover{color:var(--ui)}
-.vact{display:flex; justify-content:flex-end; gap:8px}
+.vact{display:flex; flex-wrap:wrap; justify-content:flex-end; gap:8px}
 .vgo{background:var(--day); color:var(--day-ink); padding:0 18px; height:42px; border-radius:21px}
 .vgo:hover{background:var(--day); filter:brightness(1.08)}
 .vgo:disabled{opacity:.5; cursor:default}
@@ -294,11 +294,11 @@ body.locked .unlock.show{opacity:1; pointer-events:auto}
       <button>Cancella dentista</button>
       <button>Quando ho il dentista?</button>
     </div>
-    <div class="vact"><button class="ib" id="vcancel">Annulla</button><button class="ib vgo" id="vgo" disabled>Segna in agenda</button></div>
+    <div class="vact"><button class="ib" id="vforce" hidden>Scrivi nelle note di oggi</button><button class="ib" id="vcancel">Annulla</button><button class="ib vgo" id="vgo" disabled>Segna in agenda</button></div>
   </div>
 </div>
 
-<script src="/app.js?v=7"></script>
+<script src="/app.js?v=8"></script>
 
 <script>
 if('serviceWorker' in navigator){addEventListener('load',()=>navigator.serviceWorker.register('/sw.js').catch(()=>{}))}
