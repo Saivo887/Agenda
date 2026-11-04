@@ -75,7 +75,7 @@ function mountSheet(i,before){
   el.querySelector('.wk-toggle').addEventListener('click',()=>{const on=book.classList.toggle('week-open');
     el.querySelector('.wk-toggle').setAttribute('aria-expanded',on); try{localStorage.setItem(KEY+'-week',on?'1':'0')}catch(e){}});
   el.querySelector('.wk-toggle').setAttribute('aria-expanded',book.classList.contains('week-open'));
-  refresh(sh);
+  refresh(sh); applyHits(sh);
   let raf=0, lastH=0;
   sh.ro=new ResizeObserver(()=>{cancelAnimationFrame(raf); raf=requestAnimationFrame(()=>{ if(front.clientHeight!==lastH||front.clientWidth!==sh.W){lastH=front.clientHeight; sizeCanvas(sh); redraw(sh); fitBook()} })});
   sh.ro.observe(front);
@@ -412,6 +412,64 @@ function setSlot(k,sl,val){
   if(cur&&cur.key===k){const ta=cur.tas.find(t=>t.dataset.h===String(sl)); if(ta){ta.value=sl==='n'?data.n:(data.h[sl]||''); grow(ta)}}
 }
 
+// ---- Domande e ricerca ----
+const ASK_RE=/^\s*(?:(?:ehi|ok|hey)\s+agenda\s*,?\s*)?(?:(?:mi\s+)?(?:sai\s+dire|dici|puoi\s+dirmi|ricordi)\s+)?(?:quando|cerca(?:mi)?|trova(?:mi)?|ricerca|dov['’]?\s*è|dove|a\s+che\s+ora|che\s+giorno|in\s+che\s+giorno|che\s+cosa|cosa|mostra(?:mi)?|fammi\s+vedere|c['’]?\s*è|ci\s+sono|ho\s+(?:segnato|messo|scritto|annotato))\b/i;
+const QSTOP=new Set([...STOP,'ho','hai','ha','segnato','messo','scritto','annotato','quando','cosa','che','c','è','e','in','agenda','prossimo','prossima','mio','mia','miei','mie','a','ora','giorno','mi','ci','sono','un','l','prima','dopo','ancora','qualcosa','devo','fare','c\'è']);
+function norm(x){return String(x).toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,'')}
+function parseAsk(src){
+  const q=src.trim(); const m=q.match(ASK_RE); if(!m&&!/\?\s*$/.test(q)) return null;
+  const body=q.slice(m?m[0].length:0).replace(/\?+\s*$/,'');
+  const p=parseLocal(body);
+  const words=norm(p.text).split(/[^a-z0-9]+/).filter(w=>w.length>1&&!QSTOP.has(w));
+  return {words,label:words.join(' '),date:p.found?p.date:null};
+}
+let fState=null;
+const findEl=document.getElementById('find'), fTerm=document.getElementById('fTerm'), fInfo=document.getElementById('fInfo');
+function lineHit(line,words){const l=norm(line); return words.every(w=>l.includes(w))}
+function searchAll(words){
+  const out=[];
+  for(const k of Object.keys(store)){const d=store[k]; if(!d) continue; const [y,mo,da]=k.split('-').map(Number);
+    for(const sl of Object.keys(d.h||{})) (d.h[sl]||'').split('\n').forEach(line=>{ if(line.trim()&&lineHit(line,words)) out.push({k,sl,line:line.trim(),date:new Date(y,mo-1,da),ord:+sl}) });
+    (d.n||'').split('\n').forEach(line=>{ if(line.trim()&&lineHit(line,words)) out.push({k,sl:'n',line:line.trim(),date:new Date(y,mo-1,da),ord:99}) });
+  }
+  return out.sort((a,b)=>a.k.localeCompare(b.k)||a.ord-b.ord);
+}
+function runFind(a){
+  if(!a.words.length){ closeFind();
+    if(a.date){goTo(idxOf(a.date)); const n=Object.values((store[keyOf(a.date)]||{}).h||{}).filter(Boolean).length;
+      toast(`<span>${GG[a.date.getDay()]} ${a.date.getDate()} ${MM[a.date.getMonth()].toLowerCase()}<small>${n?n+(n>1?' ore con appunti':' ora con appunti'):'Nessun appunto per quel giorno'}</small></span>`,null,4000)}
+    else toast('Dimmi cosa cercare, ad esempio: quando ho il dentista?',null,4000);
+    return}
+  let res=searchAll(a.words); if(a.date){const kk=keyOf(a.date); const same=res.filter(r=>r.k===kk); if(same.length) res=same}
+  if(!res.length){closeFind(); toast(`<span>Non ho trovato «${esc(a.label)}»<small>in nessun giorno dell'agenda</small></span>`,null,4500); return}
+  const now=new Date(), todayK=keyOf(T0), nowH=now.getHours();
+  let i=res.findIndex(r=>r.k>todayK||(r.k===todayK&&(r.sl==='n'||+r.sl>=nowH)));
+  if(i<0) i=res.length-1;
+  fState={words:a.words,label:a.label,res,i}; toastEl.classList.add('hide');
+  findEl.hidden=false; findGo(i);
+}
+function findGo(i){
+  if(!fState) return; fState.i=Math.max(0,Math.min(fState.res.length-1,i)); const r=fState.res[fState.i], d=r.date;
+  const past=r.k<keyOf(T0);
+  fTerm.textContent=r.line;
+  fInfo.textContent=`${fState.i+1} di ${fState.res.length} · ${GS[d.getDay()].toLowerCase()} ${d.getDate()} ${MM[d.getMonth()].slice(0,3).toLowerCase()}${d.getFullYear()!==T0.getFullYear()?' '+d.getFullYear():''}${r.sl==='n'?' · note':' · '+String(r.sl).padStart(2,'0')+':00'}${past?' · passato':''}`;
+  document.getElementById('fPrev').disabled=fState.i===0; document.getElementById('fNext').disabled=fState.i===fState.res.length-1;
+  const ti=idxOf(d);
+  const show=()=>{ if(!cur||cur.key!==r.k) return; applyHits(cur); const ta=cur.tas.find(t=>t.dataset.h===String(r.sl)); if(!ta) return;
+    const row=ta.closest('.row')||ta.closest('.notes'); row.classList.remove('flash'); void row.offsetWidth; row.classList.add('flash');
+    const sr=stage.getBoundingClientRect(), rr=row.getBoundingClientRect(); stage.scrollTop+=rr.top-sr.top-sr.height*.3};
+  if(ti===idx&&!flip) show(); else if(!flip){goTo(ti); setTimeout(show,(parseFloat(getComputedStyle(root).getPropertyValue('--dur'))||0)*1000+120)}
+}
+function applyHits(sh){
+  sh.el.querySelectorAll('.hit').forEach(e=>e.classList.remove('hit'));
+  if(!fState) return;
+  sh.tas.forEach(ta=>{ if(ta.value.split('\n').some(l=>l.trim()&&lineHit(l,fState.words))) (ta.closest('.row')||ta.closest('.notes')).classList.add('hit') });
+}
+function closeFind(){fState=null; findEl.hidden=true; if(cur) applyHits(cur)}
+document.getElementById('fPrev').onclick=()=>findGo(fState.i-1);
+document.getElementById('fNext').onclick=()=>findGo(fState.i+1);
+document.getElementById('fClose').onclick=closeFind;
+
 // ---- Pannello vocale ----
 const vscrim=document.getElementById('vscrim'), vtext=document.getElementById('vtext'), vstat=document.getElementById('vstat'), vmic=document.getElementById('vmic'), vgo=document.getElementById('vgo');
 const SR=window.SpeechRecognition||window.webkitSpeechRecognition; let rec=null, recOn=false, micBlocked=!SR;
@@ -437,6 +495,8 @@ function startRec(){
 function stopRec(){ if(rec&&recOn){try{rec.stop()}catch(e){}} }
 async function submitVoice(){
   const src=vtext.value.trim(); if(!src) return; stopRec();
+  const ask=parseAsk(src);
+  if(ask){closeVoice(); runFind(ask); return}
   const del=parseDelete(src);
   if(del){closeVoice(); deleteEntry(del); return}
   vgo.disabled=true; vgo.textContent='Sto segnando…';

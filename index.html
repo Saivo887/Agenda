@@ -210,8 +210,21 @@ canvas.live{position:absolute; left:0; top:0; z-index:3; pointer-events:none}
 .pc.custom input{position:absolute; inset:0; opacity:0; width:100%; height:100%; cursor:pointer; border:0; padding:0}
 .tl:focus-visible,.sz:focus-visible,.pc:focus-visible{outline:2px solid var(--day); outline-offset:2px}
 
+/* Ricerca tipo "trova nel PDF" */
+.find{position:fixed; left:50%; transform:translateX(-50%); top:calc(env(safe-area-inset-top,0px) + 56px); z-index:12;
+  width:min(440px, calc(100% - 24px)); display:flex; align-items:center; gap:4px; padding:5px 5px 5px 14px; border-radius:22px;
+  background:var(--ui); color:var(--desk); box-shadow:0 16px 40px -14px rgba(0,0,0,.5)}
+.find .fq{flex:1; min-width:0; display:grid; gap:1px}
+.find b{font:800 14px/1.2 var(--f-display); white-space:nowrap; overflow:hidden; text-overflow:ellipsis}
+.find small{font:500 11.5px/1.2 var(--f-mono); opacity:.75; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; font-variant-numeric:tabular-nums}
+.find .ib{color:var(--desk); height:38px; min-width:38px}
+.find .ib:hover{background:color-mix(in srgb, var(--desk) 14%, transparent)}
+.find .ib:disabled{opacity:.35; cursor:default}
+.row.hit,.notes.hit{background:color-mix(in srgb, #f2b01e 22%, transparent)}
+.row.hit .hr{background:#f2b01e; color:#2a1d00}
+
 /* Lucchetto: agenda a tutto schermo, nessun comando visibile */
-body.locked .top, body.locked .dock, body.locked .kit, body.locked .wk-toggle, body.locked .week{display:none!important}
+body.locked .top, body.locked .dock, body.locked .kit, body.locked .find, body.locked .wk-toggle, body.locked .week{display:none!important}
 body.locked textarea, body.locked canvas.ink{pointer-events:none}
 body.locked .stage{padding-block:max(10px, env(safe-area-inset-top,0px)) 28px}
 body.locked .row.now .hr{background:transparent; color:var(--muted)}
@@ -250,6 +263,12 @@ body.locked .unlock.show{opacity:1; pointer-events:auto}
   <button class="ib tool" id="undo" title="Annulla"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M9 7L4 12l5 5"/><path d="M4 12h10a5 5 0 010 10h-3"/></svg></button>
   <button class="ib tool mic" id="voice" title="Appunto vocale"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5.5 11a6.5 6.5 0 0013 0M12 17.5V21"/></svg><span class="lbl">Detta</span></button>
 </div>
+<div class="find" id="find" hidden role="region" aria-label="Risultati della ricerca">
+  <div class="fq"><b id="fTerm"></b><small id="fInfo"></small></div>
+  <button class="ib" id="fPrev" aria-label="Risultato precedente"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M6 15l6-6 6 6"/></svg></button>
+  <button class="ib" id="fNext" aria-label="Risultato successivo"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M6 9l6 6 6-6"/></svg></button>
+  <button class="ib" id="fClose" aria-label="Chiudi la ricerca"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg></button>
+</div>
 <div class="kit" id="kit" hidden role="dialog" aria-label="Astuccio">
   <div><h3>Strumento</h3><div class="tools" id="tools"></div></div>
   <div><h3>Misura</h3><div class="sizes" id="sizes"></div></div>
@@ -273,12 +292,13 @@ body.locked .unlock.show{opacity:1; pointer-events:auto}
       <button>Ricordami venerdì alle 18:30 palestra</button>
       <button>Cancella l'ultimo appunto</button>
       <button>Cancella dentista</button>
+      <button>Quando ho il dentista?</button>
     </div>
     <div class="vact"><button class="ib" id="vcancel">Annulla</button><button class="ib vgo" id="vgo" disabled>Segna in agenda</button></div>
   </div>
 </div>
 
-<script src="/app.js?v=6"></script>
+<script src="/app.js?v=7"></script>
 
 <script>
 if('serviceWorker' in navigator){addEventListener('load',()=>navigator.serviceWorker.register('/sw.js').catch(()=>{}))}
