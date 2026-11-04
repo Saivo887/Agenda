@@ -30,7 +30,7 @@ img{max-width:100%}
 :root{
   --day:#13a47f; --day-ink:#ffffff;
   --desk:#e7e9ee; --desk-2:#d5d9e1; --ui:#14171c; --ui-dim:#5d6572; --ui-line:rgba(20,23,28,.12); --dock:#ffffff;
-  --paper:#ffffff; --paper-back:#f0f1f4; --dots:#d3d8e0; --line:#e6e9ee; --muted:#8a93a1; --text:#14171c;
+  --paper:#ffffff; --paper-back:#f0f1f4; --rule-soft:#eef0f4; --line:#e6e9ee; --muted:#8a93a1; --text:#14171c;
   --ink-1:#2350d8; --ink-2:#22262c; --ink-3:#e0362c;
   --f-display:"Bricolage Grotesque", "Avenir Next", system-ui, sans-serif;
   --f-hand:"Patrick Hand", "Segoe Print", "Bradley Hand", cursive;
@@ -39,11 +39,11 @@ img{max-width:100%}
 }
 @media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
   --desk:#0c0e12; --desk-2:#07080b; --ui:#eef0f4; --ui-dim:#9099a6; --ui-line:rgba(238,240,244,.13); --dock:#1b1f26;
-  --paper:#171a20; --paper-back:#22262e; --dots:#2d323c; --line:#262b34; --muted:#7b8494; --text:#eef0f4;
+  --paper:#171a20; --paper-back:#22262e; --rule-soft:#21252d; --line:#262b34; --muted:#7b8494; --text:#eef0f4;
   --ink-1:#8fb0ff; --ink-2:#e8eaee; --ink-3:#ff8a7a; color-scheme:dark}}
 :root[data-theme="dark"]{
   --desk:#0c0e12; --desk-2:#07080b; --ui:#eef0f4; --ui-dim:#9099a6; --ui-line:rgba(238,240,244,.13); --dock:#1b1f26;
-  --paper:#171a20; --paper-back:#22262e; --dots:#2d323c; --line:#262b34; --muted:#7b8494; --text:#eef0f4;
+  --paper:#171a20; --paper-back:#22262e; --rule-soft:#21252d; --line:#262b34; --muted:#7b8494; --text:#eef0f4;
   --ink-1:#8fb0ff; --ink-2:#e8eaee; --ink-3:#ff8a7a; color-scheme:dark}
 @media (prefers-reduced-motion: reduce){:root{--dur:0s}}
 
@@ -115,20 +115,21 @@ body{background:var(--desk); color:var(--ui); font-family:var(--f-display); over
 
 .slots{position:relative; z-index:1; padding:0 calc(var(--pw)*.035) 0 0}
 .row{display:grid; grid-template-columns:calc(var(--pw)*.15) 1fr; border-top:1px solid var(--line)}
-.hr{align-self:start; justify-self:end; margin:calc(var(--pw)*.026) calc(var(--pw)*.03) 0 0; padding:3px 7px; border-radius:9px;
+.hr{align-self:start; justify-self:end; margin:calc(var(--pw)*.024) calc(var(--pw)*.03) 0 0; padding:3px 7px; border-radius:9px;
   font:600 calc(var(--pw)*.026)/1 var(--f-mono); color:var(--muted); font-variant-numeric:tabular-nums}
 .row.now .hr{background:var(--day); color:var(--day-ink)}
 .row.now{border-top-color:var(--day)}
-textarea.t{display:block; width:100%; min-height:calc(var(--pw)*.075); height:calc(var(--pw)*.075); border:0; outline:none; resize:none; overflow:hidden;
-  background:transparent; color:var(--ink-1); caret-color:var(--day); padding:0; margin:0;
-  font:400 calc(var(--pw)*.047)/calc(var(--pw)*.075) var(--f-hand)}
+textarea.t{display:block; width:100%; min-height:calc(var(--pw)*.16); height:calc(var(--pw)*.16); border:0; outline:none; resize:none; overflow:hidden;
+  padding-top:calc(var(--pw)*.005)!important; background:transparent repeating-linear-gradient(to bottom, transparent 0 calc(var(--pw)*.08 - 1px), var(--rule-soft) calc(var(--pw)*.08 - 1px) calc(var(--pw)*.08)); color:var(--ink-1); caret-color:var(--day); padding:0; margin:0;
+  font:400 calc(var(--pw)*.05)/calc(var(--pw)*.08) var(--f-hand)}
 textarea.t::placeholder{color:transparent}
 .row:focus-within{background:color-mix(in srgb, var(--day) 6%, transparent)}
 .notes{position:relative; z-index:1; margin:calc(var(--pw)*.03) calc(var(--pw)*.035) calc(var(--pw)*.05) calc(var(--pw)*.05);
   padding-top:calc(var(--pw)*.02); border-top:2px solid var(--text)}
 .nl{font:600 calc(var(--pw)*.026)/1 var(--f-mono); letter-spacing:.14em; text-transform:uppercase; color:var(--muted); margin-bottom:6px}
-.notes textarea.t{min-height:calc(var(--pw)*.3)}
+.notes textarea.t{min-height:calc(var(--pw)*.4)}
 canvas.ink{position:absolute; left:0; top:0; z-index:3; touch-action:none}
+canvas.live{position:absolute; left:0; top:0; z-index:3; pointer-events:none}
 
 .mode-type canvas.ink{pointer-events:none}
 .mode-pen textarea,.mode-erase textarea{pointer-events:none}
@@ -185,6 +186,35 @@ canvas.ink{position:absolute; left:0; top:0; z-index:3; touch-action:none}
 .vgo{background:var(--day); color:var(--day-ink); padding:0 18px; height:42px; border-radius:21px}
 .vgo:hover{background:var(--day); filter:brightness(1.08)}
 .vgo:disabled{opacity:.5; cursor:default}
+
+/* Astuccio */
+.kit-btn{position:relative}
+.kit-dot{width:22px; height:22px; border-radius:50%; background:var(--kit-c,#2350d8); box-shadow:0 0 0 2px var(--dock), 0 0 0 3.5px var(--ui-line)}
+.kit{position:fixed; left:50%; transform:translateX(-50%); bottom:calc(80px + env(safe-area-inset-bottom,0px)); z-index:12;
+  width:min(420px, calc(100% - 24px)); background:var(--dock); color:var(--ui); border:1px solid var(--ui-line); border-radius:24px;
+  padding:16px; display:grid; gap:14px; box-shadow:0 24px 60px -16px rgba(0,0,0,.5)}
+.kit h3{margin:0 0 8px; font:600 11px/1 var(--f-mono); letter-spacing:.14em; text-transform:uppercase; color:var(--ui-dim)}
+.tools{display:grid; grid-template-columns:repeat(4,1fr); gap:6px}
+.tl{appearance:none; border:1px solid var(--ui-line); background:transparent; color:var(--ui); border-radius:16px; padding:10px 4px 8px; cursor:pointer;
+  display:grid; justify-items:center; gap:6px; font:600 11.5px/1 var(--f-display)}
+.tl svg{width:30px; height:30px}
+.tl[aria-pressed="true"]{border-color:var(--ui); background:var(--ui-line)}
+.sizes{display:flex; gap:8px}
+.sz{appearance:none; flex:1; height:44px; border:1px solid var(--ui-line); background:transparent; border-radius:14px; cursor:pointer; display:grid; place-items:center}
+.sz i{display:block; border-radius:50%; background:var(--kit-c,#2350d8)}
+.sz[aria-pressed="true"]{border-color:var(--ui); background:var(--ui-line)}
+.pal{display:grid; grid-template-columns:repeat(9,1fr); gap:8px}
+.pc{appearance:none; aspect-ratio:1; width:100%; border-radius:50%; border:0; padding:0; cursor:pointer; box-shadow:inset 0 0 0 1px rgba(0,0,0,.12); position:relative}
+.pc[aria-pressed="true"]{box-shadow:0 0 0 2px var(--dock), 0 0 0 4px var(--ui)}
+.pc.custom{background:conic-gradient(#e8382f,#f2b01e,#7cc242,#00a3c4,#5b6cff,#d63c86,#e8382f)}
+.pc.custom input{position:absolute; inset:0; opacity:0; width:100%; height:100%; cursor:pointer; border:0; padding:0}
+.tl:focus-visible,.sz:focus-visible,.pc:focus-visible{outline:2px solid var(--day); outline-offset:2px}
+
+/* Lucchetto: agenda a tutto schermo, nessun comando visibile */
+body.locked .top, body.locked .dock, body.locked .kit, body.locked .wk-toggle, body.locked .week{display:none!important}
+body.locked textarea, body.locked canvas.ink{pointer-events:none}
+body.locked .stage{padding-block:max(10px, env(safe-area-inset-top,0px)) 28px}
+body.locked .row.now .hr{background:transparent; color:var(--muted)}
 </style>
 
 <div class="glow"></div>
@@ -201,6 +231,10 @@ canvas.ink{position:absolute; left:0; top:0; z-index:3; touch-action:none}
       <button class="ib zl" id="zreset" title="Torna al 100%">100%</button>
       <button class="ib" id="zin" aria-label="Aumenta zoom"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M6 12h12M12 6v12"/></svg></button>
     </div>
+    <div class="pill">
+      <button class="ib" id="snd" aria-pressed="true" aria-label="Suono delle pagine"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 9.5h3.5L12 5.5v13l-4.5-4H4z"/><path class="w" d="M15.5 9a4 4 0 010 6M18 6.5a7.5 7.5 0 010 11"/><path class="x" d="M16 9.5l5 5M21 9.5l-5 5" style="display:none"/></svg></button>
+      <button class="ib" id="lock" aria-label="Blocca: solo lettura a tutto schermo"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="5" y="10.5" width="14" height="10" rx="2.5"/><path d="M8.5 10.5V8a3.5 3.5 0 017 0v2.5"/></svg></button>
+    </div>
   </div>
   <div class="stage" id="stage"><div class="book mode-pen" id="book"></div></div>
 </div>
@@ -208,15 +242,15 @@ canvas.ink{position:absolute; left:0; top:0; z-index:3; touch-action:none}
   <button class="ib tool" id="m-pen" aria-pressed="true" title="Scrivi a mano"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linejoin="round"><path d="M4 20l1.2-4.6L16 4.6a2 2 0 012.8 0l.6.6a2 2 0 010 2.8L8.6 18.8z"/><path d="M14 6.5l3.5 3.5"/></svg><span class="lbl">Penna</span></button>
   <button class="ib tool" id="m-type" aria-pressed="false" title="Scrivi con la tastiera"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"><rect x="3" y="6" width="18" height="12" rx="3"/><path d="M7 10h.01M11 10h.01M15 10h.01M8 14h8"/></svg><span class="lbl">Tastiera</span></button>
   <button class="ib tool" id="m-erase" aria-pressed="false" title="Gomma"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linejoin="round"><path d="M8.5 19H20M4.8 14.6l8.8-8.8a2 2 0 012.8 0l2.8 2.8a2 2 0 010 2.8L12 18.6H8.8z"/><path d="M9.5 9.9l5.6 5.6"/></svg><span class="lbl">Gomma</span></button>
-  <span id="inks" style="display:flex;align-items:center;gap:8px">
-    <span class="sep"></span>
-    <button class="sw" data-c="1" aria-pressed="true" aria-label="Blu" style="background:var(--ink-1)"></button>
-    <button class="sw" data-c="2" aria-pressed="false" aria-label="Grafite" style="background:var(--ink-2)"></button>
-    <button class="sw" data-c="3" aria-pressed="false" aria-label="Rosso" style="background:var(--ink-3)"></button>
-  </span>
+  <button class="ib tool kit-btn" id="kitBtn" aria-label="Astuccio: strumenti, misure e colori" aria-expanded="false"><span class="kit-dot"></span></button>
   <span class="sep"></span>
   <button class="ib tool" id="undo" title="Annulla"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M9 7L4 12l5 5"/><path d="M4 12h10a5 5 0 010 10h-3"/></svg></button>
   <button class="ib tool mic" id="voice" title="Appunto vocale"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5.5 11a6.5 6.5 0 0013 0M12 17.5V21"/></svg><span class="lbl">Detta</span></button>
+</div>
+<div class="kit" id="kit" hidden role="dialog" aria-label="Astuccio">
+  <div><h3>Strumento</h3><div class="tools" id="tools"></div></div>
+  <div><h3>Misura</h3><div class="sizes" id="sizes"></div></div>
+  <div><h3>Colore</h3><div class="pal" id="pal"></div></div>
 </div>
 <div class="toast" id="toast"><span id="toastMsg">Due dita per zoom e scorrimento · trascina dal bordo o di lato per sfogliare</span><button id="toastBtn" hidden>Annulla</button></div>
 
@@ -238,7 +272,7 @@ canvas.ink{position:absolute; left:0; top:0; z-index:3; touch-action:none}
   </div>
 </div>
 
-<script src="/app.js"></script>
+<script src="/app.js?v=3"></script>
 
 <script>
 if('serviceWorker' in navigator){addEventListener('load',()=>navigator.serviceWorker.register('/sw.js').catch(()=>{}))}
