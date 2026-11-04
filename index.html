@@ -215,6 +215,14 @@ body.locked .top, body.locked .dock, body.locked .kit, body.locked .wk-toggle, b
 body.locked textarea, body.locked canvas.ink{pointer-events:none}
 body.locked .stage{padding-block:max(10px, env(safe-area-inset-top,0px)) 28px}
 body.locked .row.now .hr{background:transparent; color:var(--muted)}
+body.locked{-webkit-touch-callout:none; -webkit-user-select:none; user-select:none}
+.unlock{position:fixed; right:max(16px, env(safe-area-inset-right,0px)); bottom:calc(18px + env(safe-area-inset-bottom,0px)); z-index:15;
+  width:56px; height:56px; border-radius:50%; border:1px solid var(--ui-line); background:color-mix(in srgb, var(--dock) 88%, transparent); color:var(--ui);
+  backdrop-filter:blur(12px); -webkit-backdrop-filter:blur(12px); box-shadow:0 10px 30px -10px rgba(0,0,0,.45);
+  display:none; place-items:center; opacity:0; pointer-events:none; transition:opacity .3s; cursor:pointer}
+.unlock svg{width:24px; height:24px}
+body.locked .unlock{display:grid}
+body.locked .unlock.show{opacity:1; pointer-events:auto}
 </style>
 
 <div class="glow"></div>
@@ -252,6 +260,7 @@ body.locked .row.now .hr{background:transparent; color:var(--muted)}
   <div><h3>Misura</h3><div class="sizes" id="sizes"></div></div>
   <div><h3>Colore</h3><div class="pal" id="pal"></div></div>
 </div>
+<button class="unlock" id="unlock" aria-label="Sblocca l'agenda"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="5" y="10.5" width="14" height="10" rx="2.5"/><path d="M8.5 10.5V8a3.5 3.5 0 016.8-1.2"/></svg></button>
 <div class="toast" id="toast"><span id="toastMsg">Due dita per zoom e scorrimento · trascina dal bordo o di lato per sfogliare</span><button id="toastBtn" hidden>Annulla</button></div>
 
 <div class="scrim" id="vscrim" hidden>
@@ -272,7 +281,7 @@ body.locked .row.now .hr{background:transparent; color:var(--muted)}
   </div>
 </div>
 
-<script src="/app.js?v=3"></script>
+<script src="/app.js?v=4"></script>
 
 <script>
 if('serviceWorker' in navigator){addEventListener('load',()=>navigator.serviceWorker.register('/sw.js').catch(()=>{}))}

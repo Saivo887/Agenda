@@ -243,7 +243,7 @@ function release(e){
   if(gesture&&e.pointerId===gesture.id){const g=gesture; gesture=null; clearTimeout(longT);
     if(g.axis==='x') endFlip((flip?flip.p:0)>.28);
     else if(!g.axis&&g.edge&&g.moved<8) animateFlip(g.edge);
-    else if(!g.axis&&g.lock&&g.moved<8&&performance.now()-g.t0<400){const r=(e.clientX-g.vl)/g.w; if(r>.65) animateFlip(1); else if(r<.35) animateFlip(-1)}
+    else if(!g.axis&&g.lock&&g.moved<8&&performance.now()-g.t0<400){const r=(e.clientX-g.vl)/g.w; if(r>.65) animateFlip(1); else if(r<.35) animateFlip(-1); showUnlock()}
   }
 }
 stage.addEventListener('pointerup',release); stage.addEventListener('pointercancel',release);
@@ -473,9 +473,13 @@ function setLock(on){
   if(document.activeElement&&document.activeElement.blur) document.activeElement.blur();
   try{ if(on){const r=document.documentElement; (r.requestFullscreen||r.webkitRequestFullscreen||function(){}).call(r)} else if(document.fullscreenElement||document.webkitFullscreenElement){(document.exitFullscreen||document.webkitExitFullscreen).call(document)} }catch(e){}
   requestAnimationFrame(()=>{lastW=stage.clientWidth; layout()});
-  toast(on?'Agenda bloccata. Sfoglia con il dito; tieni premuto sulla pagina per sbloccarla.':'Agenda sbloccata',null,on?3500:1800);
+  toast(on?'Agenda bloccata. Per sbloccarla tocca la pagina: in basso a destra compare il lucchetto.':'Agenda sbloccata',null,on?4000:1800); if(on) showUnlock(); else unlockBtn.classList.remove('show');
 }
 document.getElementById('lock').onclick=()=>setLock(true);
+const unlockBtn=document.getElementById('unlock'); let unlockT=0;
+function showUnlock(){unlockBtn.classList.add('show'); clearTimeout(unlockT); unlockT=setTimeout(()=>unlockBtn.classList.remove('show'),3000)}
+unlockBtn.onclick=()=>{unlockBtn.classList.remove('show'); setLock(false)};
+document.addEventListener('contextmenu',e=>{ if(locked) e.preventDefault() });
 document.addEventListener('keydown',e=>{ if(locked&&e.key==='Escape') setLock(false) });
 
 try{if(localStorage.getItem(KEY+'-week')==='1') book.classList.add('week-open')}catch(e){}
