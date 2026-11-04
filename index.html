@@ -66,6 +66,8 @@ body{background:var(--desk); color:var(--ui); font-family:var(--f-display); over
 .ib svg{width:18px; height:18px; flex:none}
 .datebtn{position:relative; height:34px; padding:0 10px; display:inline-flex; align-items:center; gap:8px; border-radius:17px; cursor:pointer;
   font:600 14px/1 var(--f-display); white-space:nowrap}
+.datebtn{appearance:none; border:0; background:transparent; color:var(--ui)}
+.datebtn:hover{background:var(--ui-line)}
 .datebtn i{width:9px; height:9px; border-radius:50%; background:var(--day); transition:--day .7s}
 .datebtn input{position:absolute; inset:0; opacity:0; width:100%; height:100%; border:0; cursor:pointer}
 .zl{font:600 12px/1 var(--f-mono); min-width:44px; text-align:center; color:var(--ui-dim); font-variant-numeric:tabular-nums}
@@ -223,6 +225,117 @@ canvas.live{position:absolute; left:0; top:0; z-index:3; pointer-events:none}
 .row.hit,.notes.hit{background:color-mix(in srgb, #f2b01e 22%, transparent)}
 .row.hit .hr{background:#f2b01e; color:#2a1d00}
 
+
+/* Impostazioni e indice */
+.sdot{position:absolute; top:6px; right:6px; width:8px; height:8px; border-radius:50%; background:transparent}
+.sdot.ok{background:#13a47f}.sdot.wait{background:#f2b01e}.sdot.off{background:#9099a6}
+#setBtn{position:relative}
+.isec h3{margin:0 0 8px; font:600 11px/1 var(--f-mono); letter-spacing:.14em; text-transform:uppercase; color:var(--ui-dim)}
+.isec{display:grid; gap:8px}
+.srow{display:flex; align-items:center; justify-content:space-between; gap:12px; font:400 14.5px/1.35 var(--f-display); min-height:40px}
+.srow select,.acct-in{font:500 14px/1 var(--f-display); color:var(--ui); background:var(--desk); border:1px solid var(--ui-line); border-radius:12px; padding:9px 10px; min-width:0}
+.acct-in{width:100%}
+.acct-in:focus,.srow select:focus{outline:2px solid var(--day); outline-offset:1px}
+.sbtn{border:1px solid var(--ui-line); padding:0 14px; height:38px; border-radius:19px; flex:none}
+.sbtn.pri{background:var(--day); color:var(--day-ink); border-color:var(--day)}
+.tg{appearance:none; flex:none; width:46px; height:28px; border-radius:14px; background:var(--ui-line); position:relative; cursor:pointer; transition:background .2s; margin:0}
+.tg::after{content:""; position:absolute; top:3px; left:3px; width:22px; height:22px; border-radius:50%; background:var(--dock); box-shadow:0 1px 3px rgba(0,0,0,.3); transition:transform .2s}
+.tg:checked{background:var(--day)}.tg:checked::after{transform:translateX(18px)}
+.tg:focus-visible{outline:2px solid var(--day); outline-offset:2px}
+.amsg{font:400 13px/1.4 var(--f-display); color:var(--ui-dim)}
+.acct-row{display:flex; gap:8px}
+.yearbar{display:flex; align-items:center; justify-content:center; gap:16px}
+.yearbar b{font:800 22px/1 var(--f-display); font-variant-numeric:tabular-nums}
+.months{display:grid; grid-template-columns:repeat(4,1fr); gap:8px}
+.mtab{appearance:none; border:0; border-radius:12px; padding:12px 4px; cursor:pointer; font:800 14px/1 var(--f-display); letter-spacing:.04em; text-transform:uppercase;
+  background:var(--mc); color:#fff; position:relative}
+.mtab.cur{box-shadow:0 0 0 2px var(--dock), 0 0 0 4px var(--ui)}
+.mtab small{display:block; margin-top:4px; font:500 10px/1 var(--f-mono); opacity:.85; text-transform:none; letter-spacing:0}
+.pickday{display:flex; align-items:center; justify-content:space-between; gap:10px; font:400 14px/1.3 var(--f-display)}
+.pickday input{font:500 14px/1 var(--f-display); color:var(--ui); background:var(--desk); border:1px solid var(--ui-line); border-radius:12px; padding:8px 10px}
+.irow{display:flex; align-items:center; gap:8px; flex-wrap:wrap; font:400 14px/1.35 var(--f-display)}
+.folds{display:flex; flex-wrap:wrap; gap:6px}
+.fchip{appearance:none; border:1px solid var(--ui-line); background:transparent; color:var(--ui); border-radius:14px; padding:7px 11px; font:600 13px/1 var(--f-display); cursor:pointer}
+.empty{font:400 13px/1.4 var(--f-display); color:var(--ui-dim)}
+.vpanel{max-height:calc(100dvh - 40px - env(safe-area-inset-top,0px) - env(safe-area-inset-bottom,0px)); overflow:auto}
+
+/* Linguette dei mesi a lato (schermi larghi) */
+.mtabs{position:fixed; right:0; top:50%; transform:translateY(-50%); z-index:6; display:none; flex-direction:column; gap:3px; padding-right:env(safe-area-inset-right,0px)}
+.mtabs button{appearance:none; border:0; cursor:pointer; width:46px; padding:7px 0 7px 8px; border-radius:10px 0 0 10px; background:var(--mc); color:#fff;
+  font:800 11px/1 var(--f-mono); letter-spacing:.06em; text-align:left; transition:width .15s; box-shadow:-2px 2px 6px rgba(0,0,0,.18)}
+.mtabs button:hover,.mtabs button.cur{width:58px}
+@media (min-width:860px){.mtabs{display:flex}}
+body.locked .mtabs, body.locked .bmtab{display:none!important}
+
+/* Angolo piegato */
+.fold{position:absolute; top:0; right:0; width:calc(var(--pw)*.1); height:calc(var(--pw)*.1); z-index:7; pointer-events:none}
+.front.folded .fold{background:linear-gradient(225deg, var(--desk) 0 49.5%, transparent 50%), linear-gradient(45deg, var(--paper-back) 0 50%, transparent 50%);
+  filter:drop-shadow(-2px 3px 3px rgba(0,0,0,.18))}
+.front.folded .fold::after{content:""; position:absolute; inset:0; background:linear-gradient(45deg, rgba(0,0,0,.08), transparent 50%)}
+
+/* Nastrino segnalibro */
+.ribbon{position:absolute; top:-6px; right:calc(var(--pw)*.29); width:calc(var(--pw)*.045); height:calc(var(--pw)*.26); z-index:6; pointer-events:none;
+  background:linear-gradient(90deg, #a3122a, #d22a43 45%, #a3122a); clip-path:polygon(0 0,100% 0,100% 100%,50% 86%,0 100%); filter:drop-shadow(0 2px 2px rgba(0,0,0,.3))}
+.bmtab{position:fixed; right:0; bottom:calc(150px + env(safe-area-inset-bottom,0px)); z-index:9; appearance:none; border:0; cursor:pointer;
+  padding:10px 12px 10px 14px; border-radius:12px 0 0 12px; background:linear-gradient(90deg,#a3122a,#d22a43); color:#fff; font:700 12px/1.1 var(--f-display);
+  box-shadow:-3px 4px 12px rgba(0,0,0,.25); padding-right:max(12px, env(safe-area-inset-right,0px))}
+
+/* Spunte e impegni riportati */
+.hr{cursor:pointer}
+.row.done .hr{background:#13a47f; color:#fff}
+.row.done textarea.t{text-decoration:line-through; text-decoration-thickness:2px; opacity:.5}
+.row.moved .hr{background:var(--ui-line); color:var(--muted)}
+.row.moved textarea.t{opacity:.45}
+.carry{position:relative; z-index:4; margin:0 calc(var(--pw)*.035) calc(var(--pw)*.02) calc(var(--pw)*.035); padding:calc(var(--pw)*.025) calc(var(--pw)*.03);
+  border-radius:calc(var(--pw)*.03); background:color-mix(in srgb, #f2b01e 18%, var(--paper)); border:1px solid color-mix(in srgb, #f2b01e 45%, transparent);
+  display:flex; flex-wrap:wrap; align-items:center; gap:8px 12px; font:500 calc(var(--pw)*.032)/1.35 var(--f-display)}
+.carry span{flex:1 1 60%; min-width:0}
+.carry button{appearance:none; border:0; border-radius:16px; padding:8px 14px; cursor:pointer; font:700 13px/1 var(--f-display); background:var(--text); color:var(--paper)}
+.carry button.ghost{background:transparent; color:var(--text); border:1px solid var(--line)}
+
+/* Foto incollate */
+.phbtn{position:relative; display:flex; align-items:center; gap:10px; padding:12px 14px; border:1px dashed var(--ui-line); border-radius:14px; cursor:pointer; font:600 14px/1.2 var(--f-display)}
+.phbtn svg{width:22px; height:22px; flex:none}
+.phbtn input{position:absolute; inset:0; opacity:0; width:100%; cursor:pointer}
+.photos{position:absolute; inset:0; z-index:2; pointer-events:none}
+.ph{position:absolute; margin:0; padding:calc(var(--pw)*.012) calc(var(--pw)*.012) calc(var(--pw)*.04); background:#fff; box-shadow:0 6px 16px -6px rgba(0,0,0,.45), 0 0 0 1px rgba(0,0,0,.05);
+  pointer-events:auto; touch-action:none; transform-origin:center; cursor:grab}
+.ph img{display:block; width:100%; height:auto; pointer-events:none; -webkit-user-drag:none; background:#eef0f4; min-height:30px}
+.ph::before{content:""; position:absolute; top:-10px; left:50%; width:34%; height:20px; transform:translateX(-50%) rotate(-2deg); background:rgba(242,236,214,.75); box-shadow:0 1px 2px rgba(0,0,0,.12)}
+.ph .ctl{display:none}
+.ph.sel{outline:2px solid var(--day); outline-offset:3px}
+.ph.sel .ctl{display:grid; position:absolute; width:34px; height:34px; border-radius:50%; place-items:center; background:var(--ui); color:var(--desk); border:2px solid #fff; cursor:pointer; font:700 16px/1 var(--f-display)}
+.ph .del{top:-14px; right:-14px}
+.ph .rsz{bottom:-14px; right:-14px; cursor:nwse-resize}
+.mode-pen .ph, .mode-erase .ph, body.locked .ph{pointer-events:none}
+
+/* Copertina */
+.cover{position:fixed; inset:0; z-index:30; perspective:2400px; background:color-mix(in srgb, var(--desk) 80%, transparent)}
+.cover-leaf{position:absolute; inset:max(12px, env(safe-area-inset-top,0px)) 12px max(12px, env(safe-area-inset-bottom,0px)) 12px; margin:auto; max-width:620px;
+  transform-origin:left center; transition:transform .7s cubic-bezier(.3,.6,.2,1), opacity .7s; border-radius:8px 26px 26px 8px;
+  background:radial-gradient(120% 80% at 30% 0%, color-mix(in srgb, var(--day) 55%, #14171c), #14171c 75%); color:#f4f2ec;
+  padding:clamp(22px,6vw,44px); display:flex; flex-direction:column; gap:clamp(14px,3vh,26px); overflow:auto; box-shadow:0 30px 70px -20px rgba(0,0,0,.6), inset 6px 0 0 rgba(255,255,255,.06)}
+.cover.open .cover-leaf{transform:rotateY(-105deg); opacity:0}
+.cv-top{display:flex; justify-content:space-between; align-items:baseline; font:600 12px/1 var(--f-mono); letter-spacing:.2em; text-transform:uppercase}
+.cv-brand{opacity:.7}
+.cv-year{font:800 clamp(56px,18vw,120px)/.8 var(--f-display); letter-spacing:-.05em; opacity:1}
+.cv-top{flex-direction:column; align-items:flex-start; gap:10px}
+.cv-hello{font:800 clamp(26px,7vw,40px)/1.05 var(--f-display); letter-spacing:-.02em}
+.cv-date{font:600 13px/1.4 var(--f-mono); letter-spacing:.1em; text-transform:uppercase; opacity:.75; margin-top:-10px}
+.cv-cols{display:grid; grid-template-columns:repeat(auto-fit,minmax(220px,1fr)); gap:18px}
+.cv-cols h3{margin:0 0 8px; font:600 11px/1 var(--f-mono); letter-spacing:.16em; text-transform:uppercase; color:var(--day); filter:brightness(1.4)}
+.cv-cols ul{list-style:none; margin:0; padding:0; display:grid; gap:7px}
+.cv-cols li{display:grid; grid-template-columns:52px 1fr; gap:8px; font:500 16px/1.3 var(--f-display); min-width:0}
+.cv-cols li b{font:600 13px/1.6 var(--f-mono); opacity:.7; font-variant-numeric:tabular-nums}
+.cv-cols li.done span{text-decoration:line-through; opacity:.5}
+.cv-cols li.none{display:block; opacity:.55; font-style:italic}
+.cv-extra{font:500 13.5px/1.5 var(--f-display); opacity:.8}
+.cv-foot{margin-top:auto; display:flex; justify-content:space-between; align-items:center; gap:12px; flex-wrap:wrap; font:500 12.5px/1.3 var(--f-display); opacity:.85}
+.cv-read{appearance:none; display:inline-flex; align-items:center; gap:8px; border:1px solid rgba(255,255,255,.25); background:rgba(255,255,255,.08); color:inherit;
+  border-radius:20px; padding:10px 16px; font:700 13.5px/1 var(--f-display); cursor:pointer}
+.cv-read svg{width:18px; height:18px}
+@media (prefers-reduced-motion: reduce){.cover-leaf{transition:opacity .2s}.cover.open .cover-leaf{transform:none}}
+
 /* Lucchetto: agenda a tutto schermo, nessun comando visibile */
 body.locked .top, body.locked .dock, body.locked .kit, body.locked .find, body.locked .wk-toggle, body.locked .week{display:none!important}
 body.locked textarea, body.locked canvas.ink{pointer-events:none}
@@ -243,12 +356,12 @@ body.locked .unlock.show{opacity:1; pointer-events:auto}
   <div class="top">
     <div class="pill">
       <button class="ib" id="prev" aria-label="Giorno precedente"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M15 5l-7 7 7 7"/></svg></button>
-      <label class="datebtn"><i></i><span id="dateTxt">—</span><input type="date" id="datePick" aria-label="Vai a una data"></label>
+      <button class="datebtn" id="dateBtn" aria-label="Apri l'indice: mesi, segnalibro, pagine piegate"><i></i><span id="dateTxt">—</span></button>
       <button class="ib" id="next" aria-label="Giorno successivo"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M9 5l7 7-7 7"/></svg></button>
       <button class="ib" id="today">Oggi</button>
     </div>
     <div class="pill">
-      <button class="ib" id="snd" aria-pressed="true" aria-label="Suono delle pagine"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 9.5h3.5L12 5.5v13l-4.5-4H4z"/><path class="w" d="M15.5 9a4 4 0 010 6M18 6.5a7.5 7.5 0 010 11"/><path class="x" d="M16 9.5l5 5M21 9.5l-5 5" style="display:none"/></svg></button>
+      <button class="ib" id="setBtn" aria-label="Impostazioni"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 00.3 1.8l.1.1a2 2 0 11-2.8 2.8l-.1-.1a1.7 1.7 0 00-1.8-.3 1.7 1.7 0 00-1 1.5V21a2 2 0 11-4 0v-.1a1.7 1.7 0 00-1.1-1.5 1.7 1.7 0 00-1.8.3l-.1.1a2 2 0 11-2.8-2.8l.1-.1a1.7 1.7 0 00.3-1.8 1.7 1.7 0 00-1.5-1H3a2 2 0 110-4h.1a1.7 1.7 0 001.5-1.1 1.7 1.7 0 00-.3-1.8l-.1-.1a2 2 0 112.8-2.8l.1.1a1.7 1.7 0 001.8.3H9a1.7 1.7 0 001-1.5V3a2 2 0 114 0v.1a1.7 1.7 0 001 1.5 1.7 1.7 0 001.8-.3l.1-.1a2 2 0 112.8 2.8l-.1.1a1.7 1.7 0 00-.3 1.8V9a1.7 1.7 0 001.5 1H21a2 2 0 110 4h-.1a1.7 1.7 0 00-1.5 1z"/></svg><span class="sdot" id="sdot"></span></button>
       <button class="ib" id="lock" aria-label="Blocca: solo lettura a tutto schermo"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="5" y="10.5" width="14" height="10" rx="2.5"/><path d="M8.5 10.5V8a3.5 3.5 0 017 0v2.5"/></svg></button>
     </div>
   </div>
@@ -273,8 +386,51 @@ body.locked .unlock.show{opacity:1; pointer-events:auto}
   <div><h3>Strumento</h3><div class="tools" id="tools"></div></div>
   <div><h3>Misura</h3><div class="sizes" id="sizes"></div></div>
   <div><h3>Colore</h3><div class="pal" id="pal"></div></div>
+  <div><h3>Foto</h3><label class="phbtn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="6" width="18" height="14" rx="3"/><circle cx="12" cy="13" r="3.5"/><path d="M8.5 6l1.5-2.5h4L15.5 6"/></svg>Incolla una foto sulla pagina<input type="file" id="phPick" accept="image/*"></label></div>
 </div>
 <button class="unlock" id="unlock" aria-label="Sblocca l'agenda"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="5" y="10.5" width="14" height="10" rx="2.5"/><path d="M8.5 10.5V8a3.5 3.5 0 016.8-1.2"/></svg></button>
+<div class="scrim" id="idxScrim" hidden>
+  <div class="vpanel" role="dialog" aria-modal="true" aria-labelledby="idxTitle">
+    <div class="vhead"><h2 id="idxTitle">Indice</h2><button class="ib" data-close aria-label="Chiudi"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg></button></div>
+    <div class="yearbar"><button class="ib" id="yPrev" aria-label="Anno precedente"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M15 5l-7 7 7 7"/></svg></button><b id="yLbl">2026</b><button class="ib" id="yNext" aria-label="Anno successivo"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M9 5l7 7-7 7"/></svg></button></div>
+    <div class="months" id="months"></div>
+    <label class="pickday">Vai a un giorno preciso <input type="date" id="datePick"></label>
+    <div class="isec"><h3>Segnalibro</h3><div class="irow" id="bmRow"></div></div>
+    <div class="isec"><h3>Pagine piegate</h3><div class="folds" id="foldList"></div></div>
+  </div>
+</div>
+
+<div class="scrim" id="setScrim" hidden>
+  <div class="vpanel" role="dialog" aria-modal="true" aria-labelledby="setTitle">
+    <div class="vhead"><h2 id="setTitle">Impostazioni</h2><button class="ib" data-close aria-label="Chiudi"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg></button></div>
+    <div class="isec" id="acct"></div>
+    <div class="isec"><h3>Promemoria</h3>
+      <label class="srow">Avvisami prima degli impegni con orario
+        <select id="remSel"><option value="0">Mai</option><option value="10">10 minuti prima</option><option value="30">30 minuti prima</option><option value="60">1 ora prima</option><option value="120">2 ore prima</option></select></label>
+      <div class="srow"><span id="pushTxt">Notifiche su questo telefono: non attive</span><button class="ib sbtn" id="pushBtn">Attiva</button></div>
+    </div>
+    <div class="isec"><h3>Preferenze</h3>
+      <label class="srow">Risposte a voce dell'assistente<input type="checkbox" class="tg" id="tVoice"></label>
+      <label class="srow">Suono delle pagine<input type="checkbox" class="tg" id="tSound"></label>
+      <label class="srow">Copertina con il riepilogo all'apertura<input type="checkbox" class="tg" id="tCover"></label>
+    </div>
+  </div>
+</div>
+
+<button class="bmtab" id="bmTab" hidden><span id="bmTabTxt"></span></button>
+<nav class="mtabs" id="mtabs" aria-label="Mesi"></nav>
+
+<div class="cover" id="cover" hidden>
+  <div class="cover-leaf" id="coverLeaf">
+    <div class="cv-top"><span class="cv-year" id="cvYear"></span><span class="cv-brand">Agenda</span></div>
+    <div class="cv-hello" id="cvHello"></div>
+    <div class="cv-date" id="cvDate"></div>
+    <div class="cv-cols"><section><h3>Oggi</h3><ul id="cvToday"></ul></section><section><h3>Domani</h3><ul id="cvTomorrow"></ul></section></div>
+    <div class="cv-extra" id="cvExtra"></div>
+    <div class="cv-foot"><button class="cv-read" id="cvRead"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 9.5h3.5L12 5.5v13l-4.5-4H4z"/><path d="M15.5 9a4 4 0 010 6"/></svg>Leggimi la giornata</button><span>Tocca o scorri per aprire</span></div>
+  </div>
+</div>
+
 <div class="toast" id="toast"><span id="toastMsg">Due dita per zoom e scorrimento · trascina dal bordo o di lato per sfogliare</span><button id="toastBtn" hidden>Annulla</button></div>
 
 <div class="scrim" id="vscrim" hidden>
@@ -298,7 +454,8 @@ body.locked .unlock.show{opacity:1; pointer-events:auto}
   </div>
 </div>
 
-<script src="/app.js?v=9"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.js"></script>
+<script src="/app.js?v=14"></script>
 
 <script>
 if('serviceWorker' in navigator){addEventListener('load',()=>navigator.serviceWorker.register('/sw.js').catch(()=>{}))}

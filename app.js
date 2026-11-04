@@ -5,7 +5,7 @@ const GL=['D','L','M','M','G','V','S'];
 const MM=['Gennaio','Febbraio','Marzo','Aprile','Maggio','Giugno','Luglio','Agosto','Settembre','Ottobre','Novembre','Dicembre'];
 const DAYC=[['#e8382f','#ffffff'],['#ff6a3d','#ffffff'],['#f2b01e','#2a1d00'],['#13a47f','#ffffff'],['#2f6fff','#ffffff'],['#d63c86','#ffffff'],['#6f55ff','#ffffff']];
 const FIX={'1-1':'Capodanno','1-6':'Epifania','4-25':'Liberazione','5-1':'Festa del Lavoro','6-2':'Festa della Repubblica','8-15':'Ferragosto','11-1':'Ognissanti','12-8':'Immacolata','12-25':'Natale','12-26':'Santo Stefano'};
-const HOURS=[];for(let h=7;h<=21;h++)HOURS.push(h);
+const H0=6, H1=23; const HOURS=[];for(let h=H0;h<=H1;h++)HOURS.push(h);
 const KEY='agenda-sfogliabile-v2';
 
 const book=document.getElementById('book'), stage=document.getElementById('stage'), root=document.documentElement;
@@ -14,7 +14,7 @@ let idx=0, cur=null, flip=null, mode='type', penSeen=false, zoom=1, lastW=0, loc
 const TOOLS={pen:{n:'Penna',sizes:[.0026,.0045,.0075]},pencil:{n:'Matita',sizes:[.003,.005,.0085]},marker:{n:'Pennarello',sizes:[.009,.015,.024]},hl:{n:'Evidenziatore',sizes:[.028,.042,.06]}};
 const PALETTE=['1','2','3','#0b7a5a','#13a47f','#7cc242','#f2b01e','#ff8a00','#e8382f','#d63c86','#9b51e0','#5b6cff','#00a3c4','#8a5a3c','#6b7280','#000000','#ffffff'];
 const PNAMES={'1':'Blu','2':'Inchiostro','3':'Rosso','#0b7a5a':'Verde bosco','#13a47f':'Verde','#7cc242':'Lime','#f2b01e':'Giallo','#ff8a00':'Arancio','#e8382f':'Rosso vivo','#d63c86':'Fucsia','#9b51e0':'Viola','#5b6cff':'Indaco','#00a3c4':'Azzurro','#8a5a3c':'Marrone','#6b7280':'Grigio','#000000':'Nero','#ffffff':'Bianco'};
-let pref={tool:'pen',color:'1',size:1,sound:true};
+let pref={tool:'pen',color:'1',size:1,sound:true,voice:true,cover:true,remind:60};
 try{Object.assign(pref,JSON.parse(localStorage.getItem('agenda-pref')||'{}'))}catch(e){}
 function savePref(){try{localStorage.setItem('agenda-pref',JSON.stringify(pref))}catch(e){}}
 let gesture=null, drawing=null, pinch=null; const ptrs=new Map(); const undoMap={};
@@ -27,10 +27,14 @@ if(!Object.keys(store).length){
     for(const k in v1){const o=v1[k], h={}; (o.t||'').split('\n').forEach((l,j)=>{if(l.trim()&&j<HOURS.length)h[HOURS[j]]=l});
       store[k]={h,n:'',s:(o.s||[]).map(s=>({c:s.c==='nero'?'2':s.c==='rosso'?'3':'1',w:s.w,p:s.p.map(q=>[q[0],q[1]/.7,q[2]])}))}}}catch(e){}
 }
-if(!Object.keys(store).length) store[keyOf(T0)]={h:{9:'Riunione di reparto (esempio)',13:'Pranzo (esempio, cancella pure)'},n:'',s:[]};
-let saveT; function save(){clearTimeout(saveT); saveT=setTimeout(()=>{try{localStorage.setItem(KEY,JSON.stringify(store))}catch(e){}},300)}
-function dataFor(k){const d=store[k]||{}; return {h:d.h||{},n:d.n||'',s:d.s||[]}}
-function commit(sh){store[sh.key]=sh.data; save()}
+if(!Object.keys(store).length) store[keyOf(T0)]={h:{9:'Riunione di reparto (esempio)',13:'Pranzo (esempio, cancella pure)'},n:'',s:[],ex:1};
+const META='1970-01-01';
+function meta(){return store[META]||(store[META]={})}
+let dirty=new Set(); try{dirty=new Set(JSON.parse(localStorage.getItem('agenda-dirty')||'[]'))}catch(e){}
+let saveT; function save(k){ if(k){ if(store[k]) store[k].u=Date.now(); dirty.add(k); updateDot() }
+  clearTimeout(saveT); saveT=setTimeout(()=>{try{localStorage.setItem(KEY,JSON.stringify(store)); localStorage.setItem('agenda-dirty',JSON.stringify([...dirty]))}catch(e){} if(k) schedulePush()},300)}
+function dataFor(k){let d=store[k]; if(!d) return {h:{},n:'',s:[]}; d.h=d.h||{}; d.n=d.n||''; d.s=d.s||[]; return d}
+function commit(sh){store[sh.key]=sh.data; save(sh.key)}
 
 // ---- Date ----
 function dateOf(i){return new Date(T0.getFullYear(),T0.getMonth(),T0.getDate()+i)}
@@ -61,9 +65,10 @@ function mountSheet(i,before){
       <div class="ring" title="Giorno ${n} di ${tot}"><svg viewBox="0 0 36 36"><circle cx="18" cy="18" r="15.5" fill="none" stroke="currentColor" stroke-opacity=".25" stroke-width="3"/><circle cx="18" cy="18" r="15.5" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-dasharray="${(C*prog).toFixed(2)} ${C.toFixed(2)}"/></svg><b>${n}<small>−${tot-n}</small></b></div></div>
     <button class="wk-toggle" type="button" aria-label="Mostra o nascondi la settimana">Settimana ${isoWeek(d)}<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M6 9l6 6 6-6"/></svg></button>
     <div class="week">${week}</div>
-    <div class="slots">${HOURS.map(h=>`<div class="row${isToday&&h===nowH?' now':''}"><span class="hr">${String(h).padStart(2,'0')}:00</span><textarea class="t" data-h="${h}" rows="1" spellcheck="false" aria-label="Ore ${h}"></textarea></div>`).join('')}</div>
+    <div class="carry" hidden></div>
+    <div class="slots">${HOURS.map(h=>`<div class="row${isToday&&h===nowH?' now':''}" data-h="${h}"><span class="hr">${String(h).padStart(2,'0')}:00</span><textarea class="t" data-h="${h}" rows="1" spellcheck="false" aria-label="Ore ${h}"></textarea></div>`).join('')}</div>
     <div class="notes"><div class="nl">Note</div><textarea class="t" data-h="n" spellcheck="false" aria-label="Note"></textarea></div>
-    <canvas class="ink"></canvas><canvas class="live"></canvas><div class="shade"></div></div>
+    <div class="photos"></div><canvas class="ink"></canvas><canvas class="live"></canvas><div class="fold"></div><div class="ribbon" hidden></div><div class="shade"></div></div>
     <div class="face back"><div class="shade"></div></div>`;
   book.insertBefore(el,before||null);
   const front=el.querySelector('.front');
@@ -75,7 +80,7 @@ function mountSheet(i,before){
   el.querySelector('.wk-toggle').addEventListener('click',()=>{const on=book.classList.toggle('week-open');
     el.querySelector('.wk-toggle').setAttribute('aria-expanded',on); try{localStorage.setItem(KEY+'-week',on?'1':'0')}catch(e){}});
   el.querySelector('.wk-toggle').setAttribute('aria-expanded',book.classList.contains('week-open'));
-  refresh(sh); applyHits(sh);
+  decorate(sh); refresh(sh); applyHits(sh); renderPhotos(sh);
   let raf=0, lastH=0;
   sh.ro=new ResizeObserver(()=>{cancelAnimationFrame(raf); raf=requestAnimationFrame(()=>{ if(front.clientHeight!==lastH||front.clientWidth!==sh.W){lastH=front.clientHeight; sizeCanvas(sh); redraw(sh); fitBook()} })});
   sh.ro.observe(front);
@@ -172,7 +177,7 @@ function cancelDrawing(){ if(!drawing) return; if(drawing.sh.lctx) drawing.sh.lc
 function visRect(){const b=book.getBoundingClientRect(), s=stage.getBoundingClientRect(); return {left:Math.max(b.left,s.left),right:Math.min(b.right,s.right)}}
 
 stage.addEventListener('pointerdown',e=>{
-  if(e.target.closest('.chip,.wk-toggle')) return;
+  if(e.target.closest('.chip,.wk-toggle,.carry')) return;
   ptrs.set(e.pointerId,{x:e.clientX,y:e.clientY});
   if(e.pointerType==='pen') penSeen=true;
   wakeAudio(); if(!kit.hidden) closeKit();
@@ -188,6 +193,13 @@ stage.addEventListener('pointerdown',e=>{
   try{stage.setPointerCapture(e.pointerId)}catch(_){}
   const onCanvas=e.target.classList.contains('ink');
   const vr=visRect(), edgeW=Math.max(30,Math.min(56,(vr.right-vr.left)*.08));
+  const phEl=e.target.closest('.ph');
+  if(!phEl) selectPhoto(null);
+  if(phEl&&!locked&&mode==='type'){ e.preventDefault(); startPhoto(e,phEl); return }
+  const special=locked?null:hitSpecial(e);
+  if(special){ e.preventDefault();
+    gesture={id:e.pointerId,x0:e.clientX,y0:e.clientY,axis:null,dir:0,edge:0,w:Math.max(200,vr.right-vr.left),moved:0,sx:stage.scrollLeft,sy:stage.scrollTop,onTA:false,special};
+    return }
   if(locked){
     e.preventDefault();
     gesture={id:e.pointerId,x0:e.clientX,y0:e.clientY,axis:null,dir:0,edge:0,w:Math.max(200,vr.right-vr.left),moved:0,sx:stage.scrollLeft,sy:stage.scrollTop,onTA:false,lock:true,t0:performance.now(),vl:vr.left};
@@ -209,6 +221,7 @@ stage.addEventListener('pointerdown',e=>{
 });
 stage.addEventListener('pointermove',e=>{
   if(ptrs.has(e.pointerId)) ptrs.set(e.pointerId,{x:e.clientX,y:e.clientY});
+  if(phDrag&&e.pointerId===phDrag.id){movePhoto(e); return}
   if(pinch&&ptrs.size>=2){const ps=[...ptrs.values()], d=Math.hypot(ps[0].x-ps[1].x,ps[0].y-ps[1].y);
     const z=Math.max(.6,Math.min(3,pinch.z0*d/pinch.d0)); pinch.r=z/pinch.z0; pinch.mx=(ps[0].x+ps[1].x)/2; pinch.my=(ps[0].y+ps[1].y)/2;
     book.style.transform=`translate(${pinch.mx-pinch.mx0}px,${pinch.my-pinch.my0}px) scale(${pinch.r})`; return}
@@ -232,12 +245,14 @@ stage.addEventListener('pointermove',e=>{
 });
 function release(e){
   ptrs.delete(e.pointerId); if(!gesture) clearTimeout(longT);
+  if(phDrag&&e.pointerId===phDrag.id){endPhoto(); return}
   if(pinch){ if(ptrs.size<2){const p=pinch; pinch=null; book.style.transform=''; book.style.transformOrigin='';
       zoom=Math.max(.6,Math.min(3,p.z0*p.r)); layout(); const r1=book.getBoundingClientRect();
       stage.scrollLeft+=r1.left+p.u*r1.width-p.mx; stage.scrollTop+=r1.top+p.v*r1.width-p.my; ptrs.clear()} return }
   if(drawing&&e.pointerId===drawing.id){const d=drawing; drawing=null; if(d.s&&d.s.t==='hl'){d.sh.lctx.clearRect(0,0,d.sh.W,d.sh.H); hlPath(d.sh,d.s,d.sh.ctx)} if(d.erase&&!d.hit) undoMap[d.sh.key].pop(); commit(d.sh)}
   if(gesture&&e.pointerId===gesture.id){const g=gesture; gesture=null; clearTimeout(longT);
     if(g.axis==='x') endFlip((flip?flip.p:0)>.28);
+    else if(!g.axis&&g.special&&g.moved<8) doSpecial(g.special);
     else if(!g.axis&&g.edge&&g.moved<8) animateFlip(g.edge);
     else if(!g.axis&&g.lock&&g.moved<8&&performance.now()-g.t0<400){const r=(e.clientX-g.vl)/g.w; if(r>.65) animateFlip(1); else if(r<.35) animateFlip(-1); showUnlock()}
   }
@@ -246,8 +261,8 @@ stage.addEventListener('pointerup',release); stage.addEventListener('pointercanc
 
 // ---- Controlli ----
 const dateTxt=document.getElementById('dateTxt'), datePick=document.getElementById('datePick');
-function updateLabel(){const d=dateOf(idx); dateTxt.textContent=`${GS[d.getDay()]} ${d.getDate()} ${MM[d.getMonth()].slice(0,3)}${d.getFullYear()!==T0.getFullYear()?' '+d.getFullYear():''}`; datePick.value=keyOf(d)}
-datePick.addEventListener('change',()=>{if(!datePick.value) return; const [y,m,dd]=datePick.value.split('-').map(Number); goTo(idxOf(new Date(y,m-1,dd)))});
+function updateLabel(){const d=dateOf(idx); dateTxt.textContent=`${GS[d.getDay()]} ${d.getDate()} ${MM[d.getMonth()].slice(0,3)}${d.getFullYear()!==T0.getFullYear()?' '+d.getFullYear():''}`; datePick.value=keyOf(d); afterNav()}
+datePick.addEventListener('change',()=>{if(!datePick.value) return; const [y,m,dd]=datePick.value.split('-').map(Number); closeSheet(idxScrim); goTo(idxOf(new Date(y,m-1,dd)))});
 document.getElementById('prev').onclick=()=>animateFlip(-1);
 document.getElementById('next').onclick=()=>animateFlip(1);
 document.getElementById('today').onclick=()=>goTo(0);
@@ -349,7 +364,7 @@ Richiesta: ${JSON.stringify(src)}`;
 
 // ---- Scrittura nell'agenda ----
 function addEntry(p){
-  const k=keyOf(p.date), slot=(p.hour!==null&&p.hour>=7&&p.hour<=21)?String(p.hour):'n';
+  const k=keyOf(p.date), slot=(p.hour!==null&&p.hour>=H0&&p.hour<=H1)?String(p.hour):'n';
   const time=p.hour!==null?`${String(p.hour).padStart(2,'0')}:${String(p.minute||0).padStart(2,'0')} `:'';
   const line=(slot!=='n'&&!p.minute?'':time)+p.text;
   const sameCur=cur&&cur.key===k&&!flip;
@@ -357,7 +372,7 @@ function addEntry(p){
   const prev=slot==='n'?data.n:(data.h[slot]||'');
   const next=prev?prev.replace(/\s+$/,'')+'\n'+line:line;
   if(slot==='n') data.n=next; else data.h[slot]=next;
-  store[k]=data; save();
+  store[k]=data; save(k);
   const hist={text:p.text,when:'',restore:(quiet)=>{setSlot(k,slot,prev); const i=voiceHist.indexOf(hist); if(i>=0) voiceHist.splice(i,1); if(!quiet) toast('Appunto rimosso',null,2500)}};
   const restore=()=>hist.restore(false);
   const show=()=>{ if(!cur||cur.key!==k) return; const ta=cur.tas.find(t=>t.dataset.h===slot); ta.value=slot==='n'?data.n:(data.h[slot]||''); grow(ta);
@@ -366,7 +381,7 @@ function addEntry(p){
   const ti=idxOf(p.date);
   if(sameCur) show(); else if(!flip){goTo(ti); setTimeout(show,(parseFloat(getComputedStyle(root).getPropertyValue('--dur'))||0)*1000+120)}
   const when=`${GG[p.date.getDay()]} ${p.date.getDate()} ${MM[p.date.getMonth()].toLowerCase()}${p.hour!==null?`, ore ${String(p.hour).padStart(2,'0')}:${String(p.minute||0).padStart(2,'0')}`:', nelle note'}`;
-  hist.when=when; voiceHist.push(hist);
+  hist.when=when; voiceHist.push(hist); say(`Segnato: ${p.text}. ${when.replace(', nelle note',', nelle note del giorno')}`+(p.warn?'. '+p.warn:''));
   toast(`<span>Segnato: ${esc(p.text)}<small>${esc(when)}${p.warn?' · '+esc(p.warn):''}</small></span>`,restore,p.warn?9000:6000);
 }
 function esc(s){return String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]))}
@@ -384,8 +399,8 @@ const STOP=new Set(['appuntamento','appuntamenti','impegno','nota','appunto','ev
 function deleteEntry(d){
   if(d.last){
     const h=voiceHist.pop();
-    if(!h){toast('Non c\'è nessun appunto dettato da annullare',null,3500); return}
-    h.restore(true); toast(`<span>Cancellato: ${esc(h.text)}<small>${esc(h.when)}</small></span>`,null,4000); return}
+    if(!h){toast('Non c\'è nessun appunto dettato da annullare',null,3500); say('Non c\'è nessun appunto dettato da annullare'); return}
+    h.restore(true); say(`Ho cancellato ${h.text}`); toast(`<span>Cancellato: ${esc(h.text)}<small>${esc(h.when)}</small></span>`,null,4000); return}
   // cerca la data, se c'è, e le parole dell'appunto
   const p=parseLocal(d.query); const words=p.text.toLowerCase().split(/[^a-zà-ù0-9]+/).filter(w=>w.length>2&&!STOP.has(w));
   if(!words.length){toast('Dimmi cosa cancellare, ad esempio: cancella dentista',null,4000); return}
@@ -399,24 +414,24 @@ function deleteEntry(d){
       setSlot(k,sl,next);
       const [y,mo,da]=k.split('-').map(Number), dt=new Date(y,mo-1,da);
       const where=`${GG[dt.getDay()]} ${dt.getDate()} ${MM[dt.getMonth()].toLowerCase()}${sl==='n'?', note':', ore '+String(sl).padStart(2,'0')}`;
-      if(idxOf(dt)!==idx&&!flip) goTo(idxOf(dt));
+      if(idxOf(dt)!==idx&&!flip) goTo(idxOf(dt)); say(`Ho cancellato ${spokenLine(removed)}, ${where}`);
       toast(`<span>Cancellato: ${esc(removed.trim())}<small>${esc(where)}</small></span>`,()=>{setSlot(k,sl,txt); toast('Ripristinato',null,2000)},6000);
       return}
   }
-  toast(`<span>Non ho trovato «${esc(p.text)}»<small>${p.found?'in quel giorno':'in agenda'}</small></span>`,null,4500);
+  toast(`<span>Non ho trovato «${esc(p.text)}»<small>${p.found?'in quel giorno':'in agenda'}</small></span>`,null,4500); say(`Non ho trovato ${p.text}`);
 }
 function setSlot(k,sl,val){
   const data=(cur&&cur.key===k)?cur.data:(store[k]||(store[k]={h:{},n:'',s:[]}));
   data.h=data.h||{}; if(sl==='n') data.n=val; else if(val) data.h[sl]=val; else delete data.h[sl];
-  store[k]=data; save();
+  store[k]=data; save(k);
   if(cur&&cur.key===k){const ta=cur.tas.find(t=>t.dataset.h===String(sl)); if(ta){ta.value=sl==='n'?data.n:(data.h[sl]||''); grow(ta)}}
 }
 
 // ---- Domande e ricerca ----
 const ASK_RE=/^\s*(?:(?:ehi|ok|hey)\s+agenda\s*,?\s*)?(?:(?:mi\s+)?(?:sai\s+dire|dici|puoi\s+dirmi|ricordi)\s+)?(?:quando|cerca(?:mi)?|trova(?:mi)?|ricerca|dov['’]?\s*è|dove|a\s+che\s+ora|che\s+giorno|in\s+che\s+giorno|che\s+cosa|cosa|mostra(?:mi)?|fammi\s+vedere|c['’]?\s*è|ci\s+sono|ho\s+(?:segnato|messo|scritto|annotato))\b/i;
-const QSTOP=new Set([...STOP,'dimmi','dimmelo','sai','dire','puoi','potresti','fammi','sapere','vedere','po','poco','favore','piacere','ehi','hey','ok','allora','senti','scusa','vorrei','voglio','controlla','guarda','ho','hai','ha','segnato','messo','scritto','annotato','quando','cosa','che','c','è','e','in','agenda','prossimo','prossima','mio','mia','miei','mie','a','ora','giorno','mi','ci','sono','un','l','prima','dopo','ancora','qualcosa','devo','fare','c\'è']);
+const QSTOP=new Set([...STOP,'impegni','impegno','giornata','leggimi','riepilogo','quali','com','come','la','mia','dimmi','dimmelo','sai','dire','puoi','potresti','fammi','sapere','vedere','po','poco','favore','piacere','ehi','hey','ok','allora','senti','scusa','vorrei','voglio','controlla','guarda','ho','hai','ha','segnato','messo','scritto','annotato','quando','cosa','che','c','è','e','in','agenda','prossimo','prossima','mio','mia','miei','mie','a','ora','giorno','mi','ci','sono','un','l','prima','dopo','ancora','qualcosa','devo','fare','c\'è']);
 function norm(x){return String(x).toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,'')}
-const QW=/(?:^|[\s,])(?:quando|dov['’]?\s*è|dove|a\s+che\s+ora|in\s+che\s+giorno|che\s+giorno|cerca(?:mi)?|trova(?:mi)?|ricerca|ho\s+(?:segnato|messo|scritto|annotato)|che\s+(?:cosa\s+)?ho|cosa\s+ho|c['’]?\s*è|ci\s+sono)(?=[\s,?]|$)/i;
+const QW=/(?:^|[\s,])(?:quando|dov['’]?\s*è|dove|a\s+che\s+ora|in\s+che\s+giorno|che\s+giorno|cerca(?:mi)?|trova(?:mi)?|ricerca|ho\s+(?:segnato|messo|scritto|annotato)|che\s+(?:cosa\s+)?ho|cosa\s+ho|c['’]?\s*è|ci\s+sono|che\s+impegni|quali\s+impegni|com['’]?\s*è\s+(?:la\s+)?(?:mia\s+)?giornata|leggimi|riepilogo)(?=[\s,?]|$)/i;
 function parseAsk(src){
   const q=src.trim();
   if(ADD_RE.test(q)||DEL_RE.test(q)) return null;
@@ -440,17 +455,17 @@ function searchAll(words){
 }
 function runFind(a){
   if(!a.words.length){ closeFind();
-    if(a.date){goTo(idxOf(a.date)); const n=Object.values((store[keyOf(a.date)]||{}).h||{}).filter(Boolean).length;
-      toast(`<span>${GG[a.date.getDay()]} ${a.date.getDate()} ${MM[a.date.getMonth()].toLowerCase()}<small>${n?n+(n>1?' ore con appunti':' ora con appunti'):'Nessun appunto per quel giorno'}</small></span>`,null,4000)}
-    else toast('Dimmi cosa cercare, ad esempio: quando ho il dentista?',null,4000);
+    { const dd=a.date||new Date(T0); if(idxOf(dd)!==idx) goTo(idxOf(dd)); const sm=daySummary(dd); toast(`<span>${esc(sm.title)}<small>${esc(sm.short)}</small></span>`,null,5000); say(sm.spoken)}
     return}
   let res=searchAll(a.words); if(a.date){const kk=keyOf(a.date); const same=res.filter(r=>r.k===kk); if(same.length) res=same}
-  if(!res.length){closeFind(); toast(`<span>Non ho trovato «${esc(a.label)}»<small>in nessun giorno dell'agenda</small></span>`,null,4500); return}
+  if(!res.length){closeFind(); toast(`<span>Non ho trovato «${esc(a.label)}»<small>in nessun giorno dell'agenda</small></span>`,null,4500); say(`Non ho trovato ${a.label} in agenda`); return}
   const now=new Date(), todayK=keyOf(T0), nowH=now.getHours();
   let i=res.findIndex(r=>r.k>todayK||(r.k===todayK&&(r.sl==='n'||+r.sl>=nowH)));
   if(i<0) i=res.length-1;
   fState={words:a.words,label:a.label,res,i}; toastEl.classList.add('hide');
   findEl.hidden=false; findGo(i);
+  { const r=res[i], d=r.date, past=r.k<keyOf(T0), others=res.length-1;
+    say(`${spokenLine(r.line)}: ${past?'era ':''}${relDay(d)}${r.sl==='n'?', nelle note':', alle '+spokenTime(r.line,r.sl)}.`+(others?` Ci ${others===1?'è un altro risultato':'sono altri '+others+' risultati'}: usa le frecce per vederli.`:'')) }
 }
 function findGo(i){
   if(!fState) return; fState.i=Math.max(0,Math.min(fState.res.length-1,i)); const r=fState.res[fState.i], d=r.date;
@@ -514,6 +529,7 @@ async function submitVoice(){
 let force=false; const vforce=document.getElementById('vforce');
 function notUnderstood(src){
   vgo.disabled=false; vgo.textContent='Segna in agenda'; vforce.hidden=false;
+  say('Non ho capito. Puoi ripetere?');
   vstat.innerHTML=`Non ho capito «${esc(src)}». <b>Tocca il microfono e ripeti</b>, per esempio "segnami dentista il 25 novembre alle 16" o "quando ho il dentista?".`;
   try{navigator.vibrate&&navigator.vibrate([20,60,20])}catch(e){}
 }
@@ -564,29 +580,46 @@ renderKit(); document.getElementById('m-pen').dataset.was='';
 // ---- Suono delle pagine ----
 let actx=null;
 function wakeAudio(){ if(!pref.sound) return; try{ if(!actx){const AC=window.AudioContext||window.webkitAudioContext; if(AC) actx=new AC()} if(actx&&actx.state==='suspended') actx.resume() }catch(e){} }
-function noiseBuf(sec,crackle){const n=Math.floor(actx.sampleRate*sec), b=actx.createBuffer(1,n,actx.sampleRate), d=b.getChannelData(0);
-  for(let i=0;i<n;i++){const r=Math.random()*2-1; d[i]=Math.random()<crackle?r:r*.32} return b}
-function burst(t,dur,type,f0,f1,q,peak,att,crackle){
-  const src=actx.createBufferSource(); src.buffer=noiseBuf(dur+.05,crackle);
-  const f=actx.createBiquadFilter(); f.type=type; f.Q.value=q; f.frequency.setValueAtTime(f0,t); f.frequency.exponentialRampToValueAtTime(f1,t+dur);
-  const g=actx.createGain(); g.gain.setValueAtTime(0.0001,t); g.gain.exponentialRampToValueAtTime(peak,t+att); g.gain.exponentialRampToValueAtTime(0.0001,t+dur);
-  src.connect(f); f.connect(g); g.connect(actx.destination); src.start(t); src.stop(t+dur+.05)}
+// Sintesi di una pagina di carta che si gira: crepitio delle fibre + fruscio + spostamento d'aria + pagina che si posa
+function rnd(a,b){return a+Math.random()*(b-a)}
+function bufFrom(fn,dur){const sr=actx.sampleRate,n=Math.max(1,Math.floor(sr*dur)),b=actx.createBuffer(1,n,sr),d=b.getChannelData(0); fn(d,n,sr); return b}
+function envAt(t,peak,sharp){return t<peak?Math.pow(t/peak,1.6):Math.exp(-(t-peak)*sharp/(1-peak))}
+function crackle(dur,peak,dens,sharp){return bufFrom((d,n,sr)=>{
+  let v=0,k=0; for(let i=0;i<n;i++){const e=envAt(i/n,peak,sharp);
+    if(Math.random()<e*dens){v+=(Math.random()*2-1)*rnd(.25,1)*e; k=Math.exp(-1/(sr*rnd(.0005,.0016)))}
+    d[i]=v; v*=k}
+  for(let i=n-1;i>0;i--) d[i]=d[i]-d[i-1]*.55;   // grana leggera, come carta
+  let m=0; for(let i=0;i<n;i++) m=Math.max(m,Math.abs(d[i])); if(m) for(let i=0;i<n;i++) d[i]/=m},dur)}
+function airy(dur,peak,sharp){return bufFrom((d,n)=>{for(let i=0;i<n;i++) d[i]=(Math.random()*2-1)*envAt(i/n,peak,sharp)},dur)}
+function play(buf,t,{type='allpass',f=1000,q=.7,gain=.5,rate=1}={}){
+  const s=actx.createBufferSource(); s.buffer=buf; s.playbackRate.value=rate;
+  const fl=actx.createBiquadFilter(); fl.type=type; fl.frequency.value=f; fl.Q.value=q;
+  const g=actx.createGain(); g.gain.value=gain; s.connect(fl); fl.connect(g); g.connect(master()); s.start(t)}
+function thump(t,f0,f1,dur,gain){const o=actx.createOscillator(), g=actx.createGain(); o.type='sine';
+  o.frequency.setValueAtTime(f0,t); o.frequency.exponentialRampToValueAtTime(f1,t+dur);
+  g.gain.setValueAtTime(.0001,t); g.gain.exponentialRampToValueAtTime(gain,t+.006); g.gain.exponentialRampToValueAtTime(.0001,t+dur);
+  o.connect(g); g.connect(master()); o.start(t); o.stop(t+dur+.02)}
+let mst=null; function master(){ if(!mst){mst=actx.createGain(); mst.gain.value=.55; const lp=actx.createBiquadFilter(); lp.type='lowpass'; lp.frequency.value=6500; lp.Q.value=.5; const c=actx.createDynamicsCompressor(); c.threshold.value=-18; c.ratio.value=3; mst.connect(lp); lp.connect(c); c.connect(actx.destination)} return mst}
 function pageSound(dir){
-  if(!pref.sound) return; wakeAudio(); if(!actx) return; const t=actx.currentTime+.01;
-  if(dir>0){ // avanti: fruscio rapido che sale, poi la pagina si posa
-    burst(t,.30,'bandpass',1300,4600,.8,.55,.025,.03);
-    burst(t+.05,.18,'highpass',5000,7500,.5,.12,.02,.08);
-    burst(t+.26,.09,'lowpass',420,160,.7,.7,.006,.02);
-  } else { // indietro: la pagina si solleva, fruscio più lungo che scende
-    burst(t,.07,'lowpass',260,140,.7,.45,.005,.02);
-    burst(t+.03,.42,'bandpass',4200,1100,.7,.48,.07,.05);
-    burst(t+.1,.22,'highpass',3800,2600,.5,.08,.04,.1);
+  if(!pref.sound) return; wakeAudio(); if(!actx) return;
+  const t=actx.currentTime+.01, r=rnd(.94,1.06);
+  if(dir>0){ // avanti: fruscio morbido della pagina che gira e si posa
+    play(crackle(.5,.42,.006,4.5),t,{type:'bandpass',f:2600*r,q:.45,gain:.26,rate:r});
+    play(airy(.48,.45,4.5),t,{type:'bandpass',f:2100*r,q:.5,gain:.2});
+    play(airy(.44,.5,3.8),t+.03,{type:'lowpass',f:520,q:.6,gain:.3});
+    const land=t+.42/r;
+    play(airy(.06,.1,8),land,{type:'lowpass',f:900,q:.6,gain:.22});
+    thump(land,95,60,.07,.06);
+  } else { // indietro: si stacca piano dalla pila, fruscio un po' più lungo e cupo
+    play(airy(.04,.12,8),t,{type:'bandpass',f:1700,q:.7,gain:.14});
+    play(crackle(.58,.55,.005,3.8),t+.02,{type:'bandpass',f:2200*r,q:.45,gain:.24,rate:r*.96});
+    play(airy(.56,.55,3.8),t+.02,{type:'bandpass',f:1800*r,q:.5,gain:.2});
+    play(airy(.52,.48,3.2),t+.04,{type:'lowpass',f:440,q:.6,gain:.32});
+    const land=t+.54;
+    play(airy(.07,.1,8),land,{type:'lowpass',f:750,q:.6,gain:.18});
+    thump(land,80,55,.08,.05);
   }
 }
-const sndBtn=document.getElementById('snd');
-function renderSnd(){sndBtn.setAttribute('aria-pressed',pref.sound); sndBtn.querySelector('.w').style.display=pref.sound?'':'none'; sndBtn.querySelector('.x').style.display=pref.sound?'none':''}
-sndBtn.onclick=()=>{pref.sound=!pref.sound; savePref(); renderSnd(); if(pref.sound){wakeAudio(); pageSound(1)}};
-renderSnd();
 
 // ---- Lucchetto ----
 function setLock(on){
@@ -603,8 +636,316 @@ unlockBtn.onclick=()=>{unlockBtn.classList.remove('show'); setLock(false)};
 document.addEventListener('contextmenu',e=>{ if(locked) e.preventDefault() });
 document.addEventListener('keydown',e=>{ if(locked&&e.key==='Escape') setLock(false) });
 
+// ======================================================================
+// ---- Voce in uscita ----
+let itVoice=null;
+function pickVoice(){ try{const vs=speechSynthesis.getVoices(); itVoice=vs.find(v=>/^it/i.test(v.lang)&&/Alice|Federica|Elsa|Google|Paola/i.test(v.name))||vs.find(v=>/^it/i.test(v.lang))||null}catch(e){} }
+if('speechSynthesis' in window){pickVoice(); try{speechSynthesis.onvoiceschanged=pickVoice}catch(e){}}
+function say(t){ if(!pref.voice||!('speechSynthesis' in window)||!t) return;
+  try{speechSynthesis.cancel(); const u=new SpeechSynthesisUtterance(String(t).replace(/·/g,',').replace(/\s+/g,' ')); u.lang='it-IT'; if(itVoice) u.voice=itVoice; u.rate=1.03; speechSynthesis.speak(u)}catch(e){} }
+function cap(t){t=String(t); return t.charAt(0).toUpperCase()+t.slice(1)}
+function spokenLine(l){return String(l).replace(/^\s*\d{1,2}[:.]\d{2}\s+/,'').trim()}
+function spokenTime(line,sl){const m=String(line).match(/^\s*(\d{1,2})[:.](\d{2})/); const hh=m?+m[1]:+sl, mm=m?+m[2]:0; return (hh===1?'una':String(hh))+(mm?' e '+mm:'')}
+function keyDate(k){const [y,m,d]=k.split('-').map(Number); return new Date(y,m-1,d)}
+function fmtKey(k){const dt=keyDate(k); return `${GS[dt.getDay()].toLowerCase()} ${dt.getDate()} ${MM[dt.getMonth()].slice(0,3).toLowerCase()}${dt.getFullYear()!==T0.getFullYear()?' '+dt.getFullYear():''}`}
+function relDay(d){const n=idxOf(d); if(n===0) return 'oggi'; if(n===1) return 'domani'; if(n===-1) return 'ieri'; if(n===2) return 'dopodomani'; return `${GG[d.getDay()].toLowerCase()} ${d.getDate()} ${MM[d.getMonth()].toLowerCase()}`}
+function dayItems(k){const d=store[k], out=[]; if(!d) return out;
+  for(const sl of Object.keys(d.h||{}).sort((a,b)=>a-b)) (d.h[sl]||'').split('\n').forEach(l=>{ if(!l.trim()) return; const m=l.match(/^\s*(\d{1,2})[:.](\d{2})\s+/);
+    out.push({t:m?`${m[1].padStart(2,'0')}:${m[2]}`:`${String(sl).padStart(2,'0')}:00`,text:spokenLine(l),done:!!(d.d&&d.d[sl]),sl}) });
+  (d.n||'').split('\n').forEach(l=>{ if(l.trim()) out.push({t:'',text:l.trim(),done:false,sl:'n'}) });
+  return out}
+function daySummary(date){const k=keyOf(date), it=dayItems(k), title=`${GG[date.getDay()]} ${date.getDate()} ${MM[date.getMonth()].toLowerCase()}`;
+  if(!it.length) return {title,short:'Nessun impegno',spoken:`${cap(relDay(date))} non hai impegni.`};
+  const timed=it.filter(x=>x.t), notes=it.filter(x=>!x.t);
+  let sp=`${cap(relDay(date))} hai ${it.length===1?'un impegno':it.length+' impegni'}: `+timed.map(x=>`alle ${spokenTime(x.t)} ${x.text}${x.done?', già fatto':''}`).join('; ');
+  if(notes.length) sp+=(timed.length?'. ':'')+'Nelle note: '+notes.map(x=>x.text).join('; ');
+  return {title,short:`${it.length} ${it.length===1?'impegno':'impegni'}`,spoken:sp+'.'}}
+
+// ---- Fogli: indice e impostazioni ----
+const idxScrim=document.getElementById('idxScrim'), setScrim=document.getElementById('setScrim');
+function openSheet(sc){sc.hidden=false; closeKit()}
+function closeSheet(sc){sc.hidden=true}
+[idxScrim,setScrim].forEach(sc=>sc.addEventListener('click',e=>{ if(e.target===sc||e.target.closest('[data-close]')) closeSheet(sc) }));
+document.addEventListener('keydown',e=>{ if(e.key==='Escape'){closeSheet(idxScrim); closeSheet(setScrim)} });
+
+// ---- Indice dei mesi, segnalibro, pagine piegate ----
+const MC=['#5b6cff','#00a3c4','#13a47f','#7cc242','#d9a20f','#ff8a00','#e8382f','#d63c86','#9b51e0','#8a5a3c','#5f6b7a','#0b7a5a'];
+let idxYear=T0.getFullYear();
+const monthsEl=document.getElementById('months'), bmRow=document.getElementById('bmRow'), foldList=document.getElementById('foldList'), yLbl=document.getElementById('yLbl');
+function monthCount(y,m){let n=0; const pre=`${y}-${String(m+1).padStart(2,'0')}-`; for(const k in store) if(k.startsWith(pre)&&dayItems(k).length) n++; return n}
+function goMonth(y,m){const t=(y===T0.getFullYear()&&m===T0.getMonth())?new Date(T0):new Date(y,m,1); closeSheet(idxScrim); goTo(idxOf(t))}
+function renderIndex(){
+  yLbl.textContent=idxYear; const cd=dateOf(idx);
+  monthsEl.innerHTML=MM.map((m,i)=>{const c=monthCount(idxYear,i); return `<button class="mtab${cd.getFullYear()===idxYear&&cd.getMonth()===i?' cur':''}" data-m="${i}" style="--mc:${MC[i]}">${m.slice(0,3)}<small>${c?c+(c>1?' giorni':' giorno'):'vuoto'}</small></button>`}).join('');
+  datePick.value=keyOf(cd);
+  const bm=meta().bm, here=keyOf(cd);
+  bmRow.innerHTML=(bm?`<button class="fchip" data-go="${bm}">Vai a ${fmtKey(bm)}</button>`:'<span class="empty">Nessun segnalibro.</span>')
+    +(bm===here?'<button class="fchip" data-bm="off">Togli il segnalibro</button>':'<button class="fchip" data-bm="here">Metti il segnalibro su questa pagina</button>');
+  const folds=Object.keys(store).filter(k=>k!==META&&store[k]&&store[k].f).sort();
+  foldList.innerHTML=folds.length?folds.map(k=>`<button class="fchip" data-go="${k}">${fmtKey(k)}</button>`).join(''):'<span class="empty">Nessuna pagina piegata. Tocca l\'angolo in alto a destra di una pagina per piegarlo.</span>';
+}
+document.getElementById('dateBtn').onclick=()=>{idxYear=dateOf(idx).getFullYear(); renderIndex(); openSheet(idxScrim)};
+document.getElementById('yPrev').onclick=()=>{idxYear--; renderIndex()};
+document.getElementById('yNext').onclick=()=>{idxYear++; renderIndex()};
+monthsEl.addEventListener('click',e=>{const b=e.target.closest('[data-m]'); if(b) goMonth(idxYear,+b.dataset.m)});
+idxScrim.addEventListener('click',e=>{const g=e.target.closest('[data-go]'), m=e.target.closest('[data-bm]');
+  if(g){closeSheet(idxScrim); goTo(idxOf(keyDate(g.dataset.go)))}
+  else if(m){setBookmark(m.dataset.bm==='here'?keyOf(dateOf(idx)):null); renderIndex()}});
+const mtabs=document.getElementById('mtabs');
+function renderSideTabs(){const cd=dateOf(idx), y=cd.getFullYear();
+  mtabs.innerHTML=MM.map((m,i)=>`<button data-m="${i}" class="${cd.getMonth()===i?'cur':''}" style="--mc:${MC[i]}" aria-label="${m} ${y}">${m.slice(0,3).toUpperCase()}</button>`).join('')}
+mtabs.addEventListener('click',e=>{const b=e.target.closest('[data-m]'); if(b) goMonth(dateOf(idx).getFullYear(),+b.dataset.m)});
+
+// segnalibro
+const bmTab=document.getElementById('bmTab'), bmTabTxt=document.getElementById('bmTabTxt');
+function setBookmark(k){meta().bm=k||null; save(META); if(cur) decorate(cur); renderBmTab();
+  toast(k?'Segnalibro messo su questa pagina':'Segnalibro tolto',null,2200)}
+function renderBmTab(){const bm=meta().bm; const show=!!bm&&cur&&bm!==cur.key; bmTab.hidden=!show; if(show) bmTabTxt.textContent='Segnalibro · '+fmtKey(bm)}
+bmTab.onclick=()=>{const bm=meta().bm; if(bm) goTo(idxOf(keyDate(bm)))};
+function afterNav(){renderSideTabs(); renderBmTab()}
+
+// ---- Decorazioni della pagina: orecchia, nastro, spunte, impegni da riportare ----
+function decorate(sh){
+  sh.front.classList.toggle('folded',!!sh.data.f);
+  sh.front.querySelector('.ribbon').hidden=meta().bm!==sh.key;
+  sh.el.querySelectorAll('.row').forEach(r=>{const h=r.dataset.h; r.classList.toggle('done',!!(sh.data.d&&sh.data.d[h])); r.classList.toggle('moved',!!(sh.data.m&&sh.data.m[h]))});
+  const banner=sh.el.querySelector('.carry');
+  const items=sh.idx===0?pendingCarry():[];
+  banner.hidden=!items.length;
+  if(items.length){
+    banner.innerHTML=`<span><b>${items.length} ${items.length===1?'impegno':'impegni'}</b> dei giorni scorsi ${items.length===1?'non è spuntato':'non sono spuntati'}.</span><button data-carry="yes">Riporta a oggi</button><button class="ghost" data-carry="no">Ignora</button>`;
+    banner.onclick=e=>{const b=e.target.closest('[data-carry]'); if(!b) return; if(b.dataset.carry==='yes') carryOver(items); else {meta().carryOff=keyOf(T0); save(META); decorate(sh)}};
+  }
+}
+function pendingCarry(){
+  const tk=keyOf(T0); if(meta().carryOff===tk) return [];
+  const out=[];
+  for(let i=7;i>=1;i--){const k=keyOf(dateOf(-i)), d=store[k]; if(!d||!d.h) continue;
+    for(const sl of Object.keys(d.h).sort((a,b)=>a-b)){ if(!d.h[sl]||!d.h[sl].trim()) continue; if(d.d&&d.d[sl]) continue; if(d.m&&d.m[sl]) continue; if(/\(esempio/.test(d.h[sl])) continue; out.push({k,sl,text:d.h[sl].trim()}) } }
+  return out}
+function carryOver(items){
+  const lines=items.map(it=>it.text.split('\n').map(l=>`↪ ${spokenLine(l)} (da ${fmtKey(it.k)})`).join('\n'));
+  for(const it of items){const d=store[it.k]; d.m=d.m||{}; d.m[it.sl]=true; save(it.k)}
+  cur.data.n=(cur.data.n?cur.data.n.replace(/\s+$/,'')+'\n':'')+lines.join('\n'); commit(cur);
+  const ta=cur.tas.find(t=>t.dataset.h==='n'); ta.value=cur.data.n; grow(ta); decorate(cur);
+  const row=ta.closest('.notes'); const sr=stage.getBoundingClientRect(), rr=row.getBoundingClientRect(); stage.scrollTop+=rr.top-sr.top-sr.height*.3;
+  row.classList.remove('flash'); void row.offsetWidth; row.classList.add('flash');
+  toast(`${items.length} ${items.length===1?'impegno riportato':'impegni riportati'} nelle note di oggi`,null,3500);
+}
+function hitSpecial(e){
+  if(!cur||!e.target.closest('.book')) return null;
+  const fr=cur.front.getBoundingClientRect(), c=fr.width*.1;
+  if(e.clientX>fr.right-c&&e.clientX<=fr.right&&e.clientY>=fr.top&&e.clientY<fr.top+c) return {t:'fold'};
+  const hr=document.elementsFromPoint(e.clientX,e.clientY).find(x=>x.classList&&x.classList.contains('hr'));
+  if(hr){const row=hr.closest('.row'); if(row&&cur.el.contains(row)) return {t:'hr',h:row.dataset.h}}
+  return null}
+function doSpecial(sp){
+  const sh=cur; if(!sh) return;
+  if(sp.t==='fold'){sh.data.f=!sh.data.f; commit(sh); decorate(sh); try{navigator.vibrate&&navigator.vibrate(12)}catch(e){}
+    toast(sh.data.f?'Angolo piegato: ritrovi la pagina nell\'Indice':'Angolo spiegato',null,2200); return}
+  if(sp.t==='hr'){const h=sp.h; if(!(sh.data.h[h]||'').trim()){toast('Scrivi qualcosa in quest\'ora per poterla spuntare',null,2200); return}
+    sh.data.d=sh.data.d||{}; if(sh.data.d[h]) delete sh.data.d[h]; else sh.data.d[h]=true; commit(sh); decorate(sh); try{navigator.vibrate&&navigator.vibrate(10)}catch(e){}}
+}
+
+// ---- Foto incollate ----
+let phDrag=null; const urlCache={};
+function idb(){return new Promise((res,rej)=>{const r=indexedDB.open('agenda-photos',1); r.onupgradeneeded=()=>r.result.createObjectStore('ph'); r.onsuccess=()=>res(r.result); r.onerror=()=>rej(r.error)})}
+async function idbGet(id){try{const db=await idb(); return await new Promise(res=>{const q=db.transaction('ph').objectStore('ph').get(id); q.onsuccess=()=>res(q.result||null); q.onerror=()=>res(null)})}catch(e){return null}}
+async function idbPut(id,b){try{const db=await idb(); return await new Promise(res=>{const tx=db.transaction('ph','readwrite'); tx.objectStore('ph').put(b,id); tx.oncomplete=()=>res(true); tx.onerror=()=>res(false)})}catch(e){return false}}
+async function idbDel(id){try{const db=await idb(); db.transaction('ph','readwrite').objectStore('ph').delete(id)}catch(e){}}
+async function photoURL(id){ if(urlCache[id]) return urlCache[id]; let b=await idbGet(id);
+  if(!b&&sb&&user){try{const {data}=await sb.storage.from('photos').download(`${user.id}/${id}.jpg`); if(data){b=data; idbPut(id,b)}}catch(e){}}
+  return b?(urlCache[id]=URL.createObjectURL(b)):null}
+function renderPhotos(sh){const box=sh.front.querySelector('.photos'); box.innerHTML='';
+  (sh.data.ph||[]).forEach(p=>{const f=document.createElement('figure'); f.className='ph'; f.dataset.id=p.id;
+    f.style.left=(p.x*100)+'%'; f.style.top=`calc(var(--pw) * ${p.y})`; f.style.width=(p.w*100)+'%'; f.style.transform=`rotate(${p.r||0}deg)`;
+    f.innerHTML='<img alt="Foto incollata sulla pagina"><button class="ctl del" aria-label="Togli la foto">×</button><span class="ctl rsz" aria-hidden="true">⤡</span>';
+    box.appendChild(f); photoURL(p.id).then(u=>{ if(u) f.querySelector('img').src=u })})}
+function selectPhoto(el){ if(!cur) return; cur.el.querySelectorAll('.ph.sel').forEach(x=>{ if(x!==el) x.classList.remove('sel') }); if(el) el.classList.add('sel') }
+function startPhoto(e,el){
+  const id=el.dataset.id, p=(cur.data.ph||[]).find(x=>x.id===id); if(!p) return;
+  if(e.target.closest('.del')){removePhoto(id); return}
+  try{stage.setPointerCapture(e.pointerId)}catch(_){}
+  phDrag={id:e.pointerId,el,p,mode:e.target.closest('.rsz')?'rsz':'move',x0:e.clientX,y0:e.clientY,W:cur.front.getBoundingClientRect().width,sx:p.x,sy:p.y,sw:p.w,moved:0};
+}
+function movePhoto(e){const d=phDrag, dx=e.clientX-d.x0, dy=e.clientY-d.y0; d.moved=Math.max(d.moved,Math.hypot(dx,dy));
+  if(d.mode==='move'){d.p.x=Math.max(-.1,Math.min(.9,d.sx+dx/d.W)); d.p.y=Math.max(0,d.sy+dy/d.W); d.el.style.left=(d.p.x*100)+'%'; d.el.style.top=`calc(var(--pw) * ${d.p.y})`}
+  else {d.p.w=Math.max(.15,Math.min(.95,d.sw+dx/d.W)); d.el.style.width=(d.p.w*100)+'%'}}
+function endPhoto(){const d=phDrag; phDrag=null; if(d.moved>4){commit(cur); selectPhoto(d.el)} else selectPhoto(d.el.classList.contains('sel')?null:d.el)}
+function removePhoto(id){cur.data.ph=(cur.data.ph||[]).filter(x=>x.id!==id); commit(cur); renderPhotos(cur); idbDel(id);
+  if(sb&&user) sb.storage.from('photos').remove([`${user.id}/${id}.jpg`]).catch(()=>{}); toast('Foto tolta dalla pagina',null,2000)}
+async function shrink(file){
+  let bmp; try{bmp=await createImageBitmap(file,{imageOrientation:'from-image'})}catch(e){bmp=await createImageBitmap(file)}
+  const M=1400, sc=Math.min(1,M/Math.max(bmp.width,bmp.height)), c=document.createElement('canvas'); c.width=Math.round(bmp.width*sc); c.height=Math.round(bmp.height*sc);
+  c.getContext('2d').drawImage(bmp,0,0,c.width,c.height); return await new Promise(r=>c.toBlob(r,'image/jpeg',.82))}
+document.getElementById('phPick').addEventListener('change',async e=>{
+  const f=e.target.files&&e.target.files[0]; e.target.value=''; if(!f||!cur) return; closeKit();
+  try{const blob=await shrink(f); const id=Date.now().toString(36)+Math.random().toString(36).slice(2,7); await idbPut(id,blob);
+    const fr=cur.front.getBoundingClientRect(), sr=stage.getBoundingClientRect();
+    const p={id,x:.25,y:Math.max(.05,((sr.top+sr.height*.3)-fr.top)/fr.width),w:.5,r:+(Math.random()*6-3).toFixed(1)};
+    cur.data.ph=(cur.data.ph||[]).concat(p); commit(cur); renderPhotos(cur); setMode('type');
+    toast('Foto incollata. Trascinala per spostarla; toccala per ridimensionarla o toglierla.',null,4500);
+    uploadPhoto(cur.key,p);
+  }catch(err){toast('Non sono riuscito a leggere questa foto. Prova con un\'altra immagine.',null,4000)}
+});
+async function uploadPhoto(k,p){ if(!sb||!user||p.up) return; const b=await idbGet(p.id); if(!b) return;
+  try{const {error}=await sb.storage.from('photos').upload(`${user.id}/${p.id}.jpg`,b,{contentType:'image/jpeg',upsert:true}); if(!error){p.up=1; save(k)}}catch(e){}}
+
+// ---- Account e sincronizzazione (Supabase) ----
+const SB_URL='https://vpzzwmcsnpezrjzndsez.supabase.co';
+const SB_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZwenp3bWNzbnBlenJqem5kc2V6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTM4MDM3MjUsImV4cCI6MjEwOTM3OTcyNX0.stUk6bheO3O70TKK7LpgMvRYE2Cr-2ubxs4H8vTLEXQ';
+const VAPID='BA9KzcxMMJK86IuSqdhKjVm7hd474bp4u8GuyAnRILHSST6KLfCF3NKyIbOP2tCNgwoWJ9PhSWnkPyMj2xb7Ahs';
+let sb=null, user=null, syncing=false, pushT=0, lastSync=0, authStep='signup', authEmail='', authMsg='';
+try{ if(window.supabase) sb=window.supabase.createClient(SB_URL,SB_KEY,{auth:{persistSession:true,autoRefreshToken:true,detectSessionInUrl:true,storageKey:'agenda-auth'}}) }catch(e){sb=null}
+const sdot=document.getElementById('sdot'), acct=document.getElementById('acct');
+function updateDot(){ if(!sdot) return; sdot.className='sdot'+(!user?'':!navigator.onLine?' off':(syncing||dirty.size)?' wait':' ok') }
+function schedulePush(){ if(!sb||!user) return; clearTimeout(pushT); pushT=setTimeout(syncNow,1500) }
+async function syncNow(){
+  if(!sb||!user||syncing) return; if(!navigator.onLine){updateDot(); return}
+  syncing=true; updateDot(); renderAccount();
+  try{ await pull(); await push(); lastSync=Date.now() }catch(e){ console.warn('sync',e) }
+  syncing=false; updateDot(); renderAccount()}
+async function pull(){
+  const mk='agenda-pull-'+user.id, since=localStorage.getItem(mk)||'1970-01-01T00:00:00+00:00';
+  const {data,error}=await sb.from('days').select('day,data,updated_at').gt('updated_at',since).order('updated_at',{ascending:true}).limit(2000);
+  if(error) throw error; let maxT=since; const changed=[];
+  for(const r of data||[]){const k=r.day, rd=r.data||{}, ru=rd.u||Date.parse(r.updated_at), ld=store[k];
+    if(r.updated_at>maxT) maxT=r.updated_at;
+    if(ld&&(ld.u||0)>=ru) continue;
+    store[k]=rd; dirty.delete(k); changed.push(k)}
+  try{localStorage.setItem(mk,maxT)}catch(e){}
+  if(changed.length){ try{localStorage.setItem(KEY,JSON.stringify(store)); localStorage.setItem('agenda-dirty',JSON.stringify([...dirty]))}catch(e){} onRemote(changed) }}
+function onRemote(keys){
+  if(keys.includes(META)){ if(cur) decorate(cur); renderBmTab() }
+  if(cur&&keys.includes(cur.key)&&!flip&&!drawing&&!cur.el.contains(document.activeElement)){
+    const old=cur, top=stage.scrollTop; cur=mountSheet(idx,null); removeSheet(old); setDay(cur); fitBook(); stage.scrollTop=top }}
+async function push(){
+  if(!dirty.size) return; const keys=[...dirty].filter(k=>store[k]);
+  const rows=keys.map(k=>({user_id:user.id,day:k,data:store[k],updated_at:new Date().toISOString()}));
+  for(let i=0;i<rows.length;i+=200){const {error}=await sb.from('days').upsert(rows.slice(i,i+200),{onConflict:'user_id,day'}); if(error) throw error}
+  keys.forEach(k=>dirty.delete(k)); try{localStorage.setItem('agenda-dirty',JSON.stringify([...dirty]))}catch(e){}
+  for(const k of keys) for(const p of (store[k].ph||[])) if(!p.up) uploadPhoto(k,p);
+  syncReminders(keys.filter(k=>k!==META));
+}
+function renderAccount(){
+  if(!acct) return;
+  if(!sb){acct.innerHTML='<h3>Account e sincronizzazione</h3><p class="amsg">Per il primo accesso serve la connessione a internet. Riapri l\'app quando sei online.</p>'; return}
+  if(!user){
+    const reg=authStep==='signup';
+    acct.innerHTML=`<h3>Account e sincronizzazione</h3><p class="amsg">${reg?'Crea il tuo account: l\'agenda viene salvata online e la ritrovi uguale su telefono, tablet e computer.':'Entra con email e password per salvare l\'agenda online e ritrovarla su tutti i tuoi dispositivi.'}</p>
+      <input class="acct-in" id="aEmail" type="email" placeholder="nome@email.it" autocomplete="email" value="${esc(authEmail)}">
+      <input class="acct-in" id="aPass" type="password" placeholder="${reg?'Scegli una password (almeno 6 caratteri)':'Password'}" autocomplete="${reg?'new-password':'current-password'}">
+      <div class="acct-row"><button class="ib sbtn pri" id="${reg?'aSignup':'aLogin'}">${reg?'Crea account':'Entra'}</button><button class="ib" id="aSwitch">${reg?'Ho già un account':'Non hai un account? Crealo'}</button></div>${authMsg?`<p class="amsg">${authMsg}</p>`:''}`;
+    return}
+  const st=syncing?'Sincronizzazione in corso…':!navigator.onLine?'Sei offline: salvo tutto appena torni in rete':dirty.size?`${dirty.size} ${dirty.size===1?'pagina':'pagine'} da salvare`:lastSync?`Tutto salvato online alle ${new Date(lastSync).toLocaleTimeString('it-IT',{hour:'2-digit',minute:'2-digit'})}`:'Collegato';
+  acct.innerHTML=`<h3>Account e sincronizzazione</h3><div class="srow"><span>Connesso come <b>${esc(user.email||'')}</b><br><span class="amsg">${st}</span></span><button class="ib sbtn" id="aSync">Sincronizza</button></div><div><button class="ib sbtn" id="aOut">Esci</button></div>`;
+}
+acct&&acct.addEventListener('click',async e=>{
+  const id=e.target.id;
+  if(id==='aLogin'||id==='aSignup'){
+    const em=(document.getElementById('aEmail').value||'').trim(), pw=document.getElementById('aPass').value||'';
+    authEmail=em;
+    if(!/^\S+@\S+\.\S+$/.test(em)){authMsg='Scrivi un indirizzo email valido.'; renderAccount(); return}
+    if(pw.length<6){authMsg='La password deve avere almeno 6 caratteri.'; renderAccount(); return}
+    e.target.disabled=true; e.target.textContent='Un attimo…';
+    if(id==='aLogin'){const {error}=await sb.auth.signInWithPassword({email:em,password:pw});
+      authMsg=error?(/confirm/i.test(error.message)?'Account non ancora confermato: su Supabase disattiva «Confirm email», poi riprova.':'Email o password non corretti.'):''}
+    else {const {data,error}=await sb.auth.signUp({email:em,password:pw});
+      if(error) authMsg=/registered|exists/i.test(error.message)?'Questa email ha già un account: usa «Ho già un account».':'Registrazione non riuscita: '+esc(error.message);
+      else if(!data.session) authMsg='Account creato, ma Supabase chiede la conferma via email. Disattiva «Confirm email» su Supabase e poi entra qui.';
+      else authMsg=''}
+    renderAccount()}
+  else if(id==='aSwitch'){authStep=authStep==='signup'?'email':'signup'; authMsg=''; renderAccount()}
+  else if(id==='aSync'){syncNow()}
+  else if(id==='aOut'){await sb.auth.signOut(); toast('Sei uscito. Le pagine restano su questo telefono.',null,3000)}
+});
+if(sb) sb.auth.onAuthStateChange((ev,session)=>{
+  const was=user&&user.id; user=session?session.user:null; updateDot(); renderAccount(); renderPush();
+  if(user&&user.id!==was){
+    if(!localStorage.getItem('agenda-pull-'+user.id)) for(const k of Object.keys(store)){const d=store[k]; if(k===META||!/\(esempio/.test(JSON.stringify(d.h||{}))) dirty.add(k)}
+    syncNow(); if(ev==='SIGNED_IN') toast(`Accesso fatto: ${esc(user.email||'')}. Sincronizzo l'agenda…`,null,3500)}
+});
+addEventListener('online',()=>{updateDot(); syncNow()}); addEventListener('offline',updateDot);
+document.addEventListener('visibilitychange',()=>{ if(document.visibilityState==='visible') syncNow() });
+setInterval(()=>{ if(document.visibilityState==='visible') syncNow() },60000);
+
+// ---- Promemoria e notifiche ----
+function remLabel(m){return m>=60?(m===60?'1 ora':(m/60)+' ore'):m+' minuti'}
+function futureKeys(){const t=keyOf(T0); return Object.keys(store).filter(k=>k!==META&&k>=t)}
+async function syncReminders(keys){
+  if(!sb||!user||!keys.length) return; const now=Date.now();
+  for(const k of keys){ const dt=keyDate(k); if(idxOf(dt)<-1) continue; const rows=[];
+    if(pref.remind>0){const d=store[k]||{};
+      for(const sl of Object.keys(d.h||{})){ if(d.d&&d.d[sl]) continue;
+        (d.h[sl]||'').split('\n').forEach(l=>{ if(!l.trim()) return; const m=l.match(/^\s*(\d{1,2})[:.](\d{2})\s+/); const hh=m?+m[1]:+sl, mm=m?+m[2]:0;
+          const at=new Date(dt.getFullYear(),dt.getMonth(),dt.getDate(),hh,mm), fire=new Date(at.getTime()-pref.remind*60000); if(fire.getTime()<=now) return;
+          const hm=`${String(hh).padStart(2,'0')}:${String(mm).padStart(2,'0')}`;
+          rows.push({user_id:user.id,day:k,fire_at:fire.toISOString(),title:`${hm} · ${spokenLine(l)}`,body:`${GG[dt.getDay()]} ${dt.getDate()} ${MM[dt.getMonth()].toLowerCase()} · tra ${remLabel(pref.remind)}`}) }) } }
+    try{ await sb.from('reminders').delete().eq('day',k).is('sent_at',null); if(rows.length) await sb.from('reminders').insert(rows) }catch(e){} }
+}
+function b64u(s){const p='='.repeat((4-s.length%4)%4), b=atob((s+p).replace(/-/g,'+').replace(/_/g,'/')); return Uint8Array.from(b,c=>c.charCodeAt(0))}
+const pushTxt=document.getElementById('pushTxt'), pushBtn=document.getElementById('pushBtn'), remSel=document.getElementById('remSel');
+const isIOS=/iPad|iPhone|iPod/.test(navigator.userAgent)||(navigator.platform==='MacIntel'&&navigator.maxTouchPoints>1);
+const standalone=matchMedia('(display-mode: standalone)').matches||navigator.standalone===true;
+async function renderPush(){
+  if(!pushTxt) return; pushBtn.hidden=false; pushBtn.disabled=false; pushBtn.textContent='Attiva';
+  if(!('serviceWorker' in navigator)||!('PushManager' in window)||!('Notification' in window)){
+    pushTxt.textContent=isIOS&&!standalone?'Su iPhone le notifiche funzionano solo con l\'app aggiunta alla schermata Home e aperta da lì.':'Questo browser non supporta le notifiche.'; pushBtn.hidden=true; return}
+  if(!user){pushTxt.textContent='Per i promemoria entra prima con la tua email (sopra).'; pushBtn.hidden=true; return}
+  let sub=null; try{const reg=await navigator.serviceWorker.ready; sub=await reg.pushManager.getSubscription()}catch(e){}
+  if(Notification.permission==='granted'&&sub){pushTxt.textContent='Notifiche su questo telefono: attive'; pushBtn.textContent='Attive'; pushBtn.disabled=true}
+  else if(Notification.permission==='denied'){pushTxt.textContent='Notifiche bloccate: abilitale per questa app nelle impostazioni del telefono.'; pushBtn.hidden=true}
+  else pushTxt.textContent='Notifiche su questo telefono: non attive';
+}
+pushBtn&&pushBtn.addEventListener('click',async()=>{
+  try{const perm=await Notification.requestPermission(); if(perm!=='granted'){renderPush(); return}
+    const reg=await navigator.serviceWorker.ready; let sub=await reg.pushManager.getSubscription();
+    if(!sub) sub=await reg.pushManager.subscribe({userVisibleOnly:true,applicationServerKey:b64u(VAPID)});
+    const j=sub.toJSON(); const {error}=await sb.from('push_subscriptions').upsert({endpoint:j.endpoint,user_id:user.id,p256dh:j.keys.p256dh,auth:j.keys.auth},{onConflict:'endpoint'});
+    if(error) throw error;
+    if(!pref.remind){pref.remind=60; savePref(); remSel.value='60'}
+    syncReminders(futureKeys()); toast('Notifiche attive: ti avviso '+remLabel(pref.remind)+' prima di ogni impegno con orario.',null,4000);
+  }catch(e){toast('Non sono riuscito ad attivare le notifiche su questo telefono.',null,3500)}
+  renderPush();
+});
+remSel&&remSel.addEventListener('change',()=>{pref.remind=+remSel.value; savePref(); syncReminders(futureKeys())});
+if('serviceWorker' in navigator) navigator.serviceWorker.addEventListener('message',ev=>{const d=ev.data||{}; if(d.type==='goto'&&d.day){closeCover(true); goTo(idxOf(keyDate(d.day)))}});
+
+// ---- Impostazioni ----
+const tVoice=document.getElementById('tVoice'), tSound=document.getElementById('tSound'), tCover=document.getElementById('tCover');
+document.getElementById('setBtn').onclick=()=>{tVoice.checked=pref.voice; tSound.checked=pref.sound; tCover.checked=pref.cover; remSel.value=String(pref.remind); renderAccount(); renderPush(); openSheet(setScrim)};
+tVoice.onchange=()=>{pref.voice=tVoice.checked; savePref(); if(pref.voice) say('Ok, ti risponderò a voce.')};
+tSound.onchange=()=>{pref.sound=tSound.checked; savePref(); if(pref.sound){wakeAudio(); pageSound(1)}};
+tCover.onchange=()=>{pref.cover=tCover.checked; savePref()};
+
+// ---- Copertina del mattino ----
+const coverEl=document.getElementById('cover');
+function li(x){return `<li class="${x.done?'done':''}"><b>${x.t||'note'}</b><span>${esc(x.text)}</span></li>`}
+function showCover(){
+  const d=new Date(T0), tm=dateOf(1), h=new Date().getHours();
+  document.getElementById('cvYear').textContent=d.getFullYear();
+  document.getElementById('cvHello').textContent=h<12?'Buongiorno':h<18?'Buon pomeriggio':'Buonasera';
+  document.getElementById('cvDate').textContent=`${GG[d.getDay()]} ${d.getDate()} ${MM[d.getMonth()]} · settimana ${isoWeek(d)}`;
+  const a=dayItems(keyOf(d)).filter(x=>!/\(esempio/.test(x.text)), b=dayItems(keyOf(tm));
+  document.getElementById('cvToday').innerHTML=a.length?a.map(li).join(''):'<li class="none">Nessun impegno: giornata libera.</li>';
+  document.getElementById('cvTomorrow').innerHTML=b.length?b.map(li).join(''):'<li class="none">Niente in programma.</li>';
+  const ex=[], bm=meta().bm, fc=Object.keys(store).filter(k=>k!==META&&store[k]&&store[k].f).length, pc=pendingCarry().length;
+  if(bm) ex.push('Segnalibro su '+fmtKey(bm)); if(fc) ex.push(fc+(fc>1?' pagine piegate':' pagina piegata')); if(pc) ex.push(pc+(pc>1?' impegni da riportare':' impegno da riportare'));
+  document.getElementById('cvExtra').textContent=ex.join(' · ');
+  coverEl.classList.remove('open'); coverEl.hidden=false;
+}
+function closeCover(quiet){ if(coverEl.hidden) return; coverEl.classList.add('open'); if(!quiet) pageSound(1); setTimeout(()=>{coverEl.hidden=true},720) }
+document.getElementById('cvRead').addEventListener('click',e=>{e.stopPropagation(); wakeAudio();
+  const t=daySummary(new Date(T0)), m=daySummary(dateOf(1)); say(`${document.getElementById('cvHello').textContent}. ${t.spoken} ${m.spoken}`)});
+let cvX=null;
+coverEl.addEventListener('pointerdown',e=>{cvX=e.clientX; wakeAudio()});
+coverEl.addEventListener('pointerup',e=>{ if(e.target.closest('.cv-read')) return; closeCover() });
+
 try{if(localStorage.getItem(KEY+'-week')==='1') book.classList.add('week-open')}catch(e){}
-lastW=stage.clientWidth; layout(); cur=mountSheet(0,null); setDay(cur); fitBook(); updateLabel();
+const qDay=new URLSearchParams(location.search).get('day');
+lastW=stage.clientWidth; layout(); cur=mountSheet(0,null); setDay(cur); fitBook(); updateLabel(); updateDot(); renderAccount();
+if(qDay&&/^\d{4}-\d{2}-\d{2}$/.test(qDay)){history.replaceState(null,'',location.pathname); setTimeout(()=>goTo(idxOf(keyDate(qDay))),300)}
+else if(pref.cover) showCover();
 if(document.fonts&&document.fonts.ready) document.fonts.ready.then(()=>{if(cur) refresh(cur); fitBook()});
 toast('Due dita per zoom e scorrimento · trascina dal bordo o di lato per sfogliare',null,5000);
 })();
