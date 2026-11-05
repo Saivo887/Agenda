@@ -14,7 +14,7 @@ let idx=0, cur=null, flip=null, mode='type', penSeen=false, zoom=1, lastW=0, loc
 const TOOLS={pen:{n:'Penna',sizes:[.0026,.0045,.0075]},pencil:{n:'Matita',sizes:[.003,.005,.0085]},marker:{n:'Pennarello',sizes:[.009,.015,.024]},hl:{n:'Evidenziatore',sizes:[.028,.042,.06]}};
 const PALETTE=['1','2','3','#0b7a5a','#13a47f','#7cc242','#f2b01e','#ff8a00','#e8382f','#d63c86','#9b51e0','#5b6cff','#00a3c4','#8a5a3c','#6b7280','#000000','#ffffff'];
 const PNAMES={'1':'Blu','2':'Inchiostro','3':'Rosso','#0b7a5a':'Verde bosco','#13a47f':'Verde','#7cc242':'Lime','#f2b01e':'Giallo','#ff8a00':'Arancio','#e8382f':'Rosso vivo','#d63c86':'Fucsia','#9b51e0':'Viola','#5b6cff':'Indaco','#00a3c4':'Azzurro','#8a5a3c':'Marrone','#6b7280':'Grigio','#000000':'Nero','#ffffff':'Bianco'};
-let pref={tool:'pen',color:'1',size:1,sound:true,voice:true,cover:true,remind:60};
+let pref={tool:'pen',color:'1',size:1,sound:true,voice:true,cover:true,remind:60,notif:true,morn:false,mornT:'07:30',ahead:false,aheadN:7,aheadD:[0],aheadT:'20:00'};
 try{Object.assign(pref,JSON.parse(localStorage.getItem('agenda-pref')||'{}'))}catch(e){}
 function savePref(){try{localStorage.setItem('agenda-pref',JSON.stringify(pref))}catch(e){}}
 let gesture=null, drawing=null, pinch=null; const ptrs=new Map(); const undoMap={};
@@ -883,7 +883,7 @@ if(sb) sb.auth.onAuthStateChange((ev,session)=>{
   const was=user&&user.id; user=session?session.user:null; updateDot(); renderAccount(); renderPush();
   if(user&&user.id!==was){
     if(!localStorage.getItem('agenda-pull-'+user.id)) for(const k of Object.keys(store)){const d=store[k]; if(k===META||!/\(esempio/.test(JSON.stringify(d.h||{}))) dirty.add(k)}
-    syncNow().then(()=>syncReminders(futureKeys())); if(ev==='SIGNED_IN') toast(`Accesso fatto: ${esc(user.email||'')}. Sincronizzo l'agenda…`,null,3500)}
+    syncNow().then(()=>syncReminders(futureKeys())); pullPrefs(); if(ev==='SIGNED_IN') toast(`Accesso fatto: ${esc(user.email||'')}. Sincronizzo l'agenda…`,null,3500)}
 });
 addEventListener('online',()=>{updateDot(); syncNow()}); addEventListener('offline',updateDot);
 document.addEventListener('visibilitychange',()=>{ if(document.visibilityState==='visible') syncNow() });
@@ -891,8 +891,8 @@ setInterval(()=>{ if(document.visibilityState==='visible') syncNow() },60000);
 
 // ---- Promemoria e notifiche ----
 async function pushReady(){ try{ if(!sb||!user||!('Notification' in window)||Notification.permission!=='granted') return false; const reg=await navigator.serviceWorker.ready; return !!(await reg.pushManager.getSubscription()) }catch(e){return false} }
-function warnPush(){ pushReady().then(ok=>{ if(ok) return;
-  const why=!user?'Per ricevere l\'avviso devi prima entrare con il tuo account':'Per ricevere l\'avviso devi attivare le notifiche su questo telefono';
+function warnPush(){ pushReady().then(ok=>{ if(ok&&pref.notif) return;
+  const why=(ok&&!pref.notif)?'Le notifiche sono spente nelle impostazioni':!user?'Per ricevere l\'avviso devi prima entrare con il tuo account':'Per ricevere l\'avviso devi attivare le notifiche su questo telefono';
   setTimeout(()=>{ toast(`<span>${why}<small>Tocca «Imposta ora»: ci vuole un minuto</small></span>`,()=>document.getElementById('setBtn').click(),9000); toastBtn.textContent='Imposta ora';
     say(why+'. Apri le impostazioni.') },2600) }) }
 function remLabel(m){return m>=1440?(m===1440?'1 giorno':(m/1440)+' giorni'):m>=60?(m===60?'1 ora':(m/60)+' ore'):m+' minuti'}
@@ -960,16 +960,59 @@ pushBtn&&pushBtn.addEventListener('click',async()=>{
     const j=sub.toJSON(); const {error}=await sb.from('push_subscriptions').upsert({endpoint:j.endpoint,user_id:user.id,p256dh:j.keys.p256dh,auth:j.keys.auth},{onConflict:'endpoint'});
     if(error) throw error;
     if(!pref.remind){pref.remind=60; savePref(); remSel.value='60'}
+    if(!pref.notif){pref.notif=true; savePref(); renderNotif()} pushPrefs(true);
     syncReminders(futureKeys()); toast('Notifiche attive: ti avviso '+remLabel(pref.remind)+' prima di ogni impegno con orario.',null,4000);
   }catch(e){toast('Non sono riuscito ad attivare le notifiche su questo telefono.',null,3500)}
   renderPush();
 });
 remSel&&remSel.addEventListener('change',()=>{pref.remind=+remSel.value; savePref(); syncReminders(futureKeys()); if(cur) decorate(cur); renderPush()});
+// ---- Menu notifiche ----
+const tNotif=document.getElementById('tNotif'), notifOpts=document.getElementById('notifOpts'), tMorn=document.getElementById('tMorn'), mornTime=document.getElementById('mornTime'), mornRow=document.getElementById('mornRow');
+const tAhead=document.getElementById('tAhead'), aheadRow=document.getElementById('aheadRow'), aheadDays=document.getElementById('aheadDays'), aheadTime=document.getElementById('aheadTime'), aheadDowsEl=document.getElementById('aheadDows'), aheadHint=document.getElementById('aheadHint');
+const DOWO=[1,2,3,4,5,6,0], DOWL={1:'L',2:'M',3:'M',4:'G',5:'V',6:'S',0:'D'}, DOWN={1:'lunedì',2:'martedì',3:'mercoledì',4:'giovedì',5:'venerdì',6:'sabato',0:'domenica'};
+const TZ=(()=>{try{return Intl.DateTimeFormat().resolvedOptions().timeZone||'Europe/Rome'}catch(e){return 'Europe/Rome'}})();
+DOWO.forEach(d=>{const b=document.createElement('button'); b.type='button'; b.dataset.d=d; b.textContent=DOWL[d]; b.setAttribute('aria-label',DOWN[d]); aheadDowsEl.appendChild(b)});
+function ahText(){const ds=[...pref.aheadD].sort((a,b)=>DOWO.indexOf(a)-DOWO.indexOf(b)); if(!ds.length) return 'Scegli almeno un giorno.';
+  const when=ds.length===7?'ogni giorno':ds.length===5&&!ds.includes(0)&&!ds.includes(6)?'dal lunedì al venerdì':'ogni '+ds.map(d=>DOWN[d]).join(', ').replace(/, ([^,]*)$/,' e $1');
+  const from=+pref.aheadT.slice(0,2)<12?'da quel giorno':'dal giorno dopo';
+  return `Riceverai ${when} alle ${pref.aheadT} il programma di ${pref.aheadN} giorni, ${from}.`}
+function renderNotif(){ tNotif.checked=pref.notif; notifOpts.classList.toggle('dis',!pref.notif);
+  tMorn.checked=pref.morn; mornTime.value=pref.mornT; mornRow.hidden=!pref.morn;
+  tAhead.checked=pref.ahead; aheadRow.hidden=!pref.ahead; aheadDays.value=String(pref.aheadN); aheadTime.value=pref.aheadT;
+  aheadDowsEl.querySelectorAll('button').forEach(b=>b.setAttribute('aria-pressed',pref.aheadD.includes(+b.dataset.d)?'true':'false'));
+  aheadHint.textContent=ahText() }
+let npT=0;
+function pushPrefs(now){ clearTimeout(npT); npT=setTimeout(async()=>{ if(!sb||!user) return;
+  try{ await sb.from('notify_prefs').upsert({user_id:user.id,enabled:pref.notif,morning:pref.morn,morning_time:pref.mornT,ahead:pref.ahead,ahead_days:pref.aheadN,ahead_dows:pref.aheadD,ahead_time:pref.aheadT,tz:TZ,updated_at:new Date().toISOString()},{onConflict:'user_id'}) }catch(e){} }, now?0:600) }
+async function pullPrefs(){ if(!sb||!user) return;
+  try{ const {data}=await sb.from('notify_prefs').select('*').eq('user_id',user.id).maybeSingle();
+    if(!data){pushPrefs(true); return}
+    Object.assign(pref,{notif:data.enabled,morn:data.morning,mornT:String(data.morning_time).slice(0,5),ahead:data.ahead,aheadN:data.ahead_days,aheadD:data.ahead_dows||[0],aheadT:String(data.ahead_time).slice(0,5)}); savePref(); renderNotif();
+    if(data.tz!==TZ) pushPrefs(true) }catch(e){} }
+function nChanged(msg){ savePref(); renderNotif(); pushPrefs(); if(msg){ toast(msg,null,3200); if(pref.notif) warnPush() } }
+tNotif.onchange=()=>{pref.notif=tNotif.checked; nChanged(pref.notif?'Notifiche accese':'Notifiche spente: non riceverai avvisi né programmi')};
+tMorn.onchange=()=>{pref.morn=tMorn.checked; nChanged(pref.morn?`Ogni mattina alle ${pref.mornT} ti mando il programma del giorno`:'Programma del mattino spento')};
+mornTime.onchange=()=>{ if(!mornTime.value) return; pref.mornT=mornTime.value.slice(0,5); nChanged(`Programma del mattino alle ${pref.mornT}`)};
+tAhead.onchange=()=>{pref.ahead=tAhead.checked; nChanged(pref.ahead?ahText():'Programma dei prossimi giorni spento')};
+aheadDays.onchange=()=>{pref.aheadN=+aheadDays.value; nChanged()};
+aheadTime.onchange=()=>{ if(!aheadTime.value) return; pref.aheadT=aheadTime.value.slice(0,5); nChanged()};
+aheadDowsEl.onclick=e=>{const b=e.target.closest('button'); if(!b) return; const d=+b.dataset.d;
+  if(pref.aheadD.includes(d)){ if(pref.aheadD.length===1){toast('Serve almeno un giorno',null,2000); return} pref.aheadD=pref.aheadD.filter(x=>x!==d) } else pref.aheadD=[...pref.aheadD,d];
+  nChanged()};
+document.querySelectorAll('[data-test]').forEach(b=>b.onclick=async()=>{
+  if(!user){toast('Entra prima con il tuo account (in alto nelle impostazioni)',null,3000); return}
+  if(!(await pushReady())){toast('Prima tocca «Attiva» per le notifiche su questo telefono',null,3200); return}
+  b.disabled=true;
+  try{ if(dirty.size) await syncNow(); const {data,error}=await sb.functions.invoke('send-reminders',{body:{test:b.dataset.test,days:pref.aheadN,tz:TZ}});
+    if(error) throw error; toast(data&&data.sent?'Prova inviata: arriva tra pochi secondi':'Non sono riuscito a raggiungere questo telefono. Tocca di nuovo «Attiva».',null,3500)
+  }catch(e){toast('Prova non riuscita, controlla la connessione',null,3000)}
+  b.disabled=false });
+renderNotif();
 if('serviceWorker' in navigator) navigator.serviceWorker.addEventListener('message',ev=>{const d=ev.data||{}; if(d.type==='goto'&&d.day){closeCover(true); goTo(idxOf(keyDate(d.day)))}});
 
 // ---- Impostazioni ----
 const tVoice=document.getElementById('tVoice'), tSound=document.getElementById('tSound'), tCover=document.getElementById('tCover');
-document.getElementById('setBtn').onclick=()=>{tVoice.checked=pref.voice; tSound.checked=pref.sound; tCover.checked=pref.cover; remSel.value=String(pref.remind); renderAccount(); renderPush(); openSheet(setScrim)};
+document.getElementById('setBtn').onclick=()=>{tVoice.checked=pref.voice; tSound.checked=pref.sound; tCover.checked=pref.cover; remSel.value=String(pref.remind); renderNotif(); renderAccount(); renderPush(); openSheet(setScrim)};
 tVoice.onchange=()=>{pref.voice=tVoice.checked; savePref(); if(pref.voice) say('Ok, ti risponderò a voce.')};
 tSound.onchange=()=>{pref.sound=tSound.checked; savePref(); if(pref.sound){wakeAudio(); pageSound(1)}};
 tCover.onchange=()=>{pref.cover=tCover.checked; savePref()};
