@@ -1,6 +1,6 @@
 {
-  "name": "Agenda",
-  "short_name": "Agenda",
+  "name": "Memi – agenda da sfogliare",
+  "short_name": "Memi",
   "description": "Agenda giornaliera da sfogliare, con scrittura a mano, tastiera e appunti a voce.",
   "lang": "it",
   "start_url": "/",
@@ -10,7 +10,23 @@
   "background_color": "#14171c",
   "theme_color": "#14171c",
   "icons": [
-    {"src": "/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any"},
-    {"src": "/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any"}
+    {
+      "src": "/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    }
   ]
 }

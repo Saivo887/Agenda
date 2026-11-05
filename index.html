@@ -3,12 +3,12 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
-<title>Agenda</title>
+<title>Memi</title>
 <meta name="description" content="Agenda giornaliera da sfogliare, con scrittura a mano, tastiera e appunti a voce.">
 <meta name="theme-color" content="#14171c">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-capable" content="yes">
-<meta name="apple-mobile-web-app-title" content="Agenda">
+<meta name="apple-mobile-web-app-title" content="Memi">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <link rel="manifest" href="/manifest.webmanifest">
 <link rel="icon" type="image/png" href="/icon-192.png">
@@ -318,7 +318,9 @@ body.locked .mtabs, body.locked .bmtab{display:none!important}
   padding:clamp(22px,6vw,44px); display:flex; flex-direction:column; gap:clamp(14px,3vh,26px); overflow:auto; box-shadow:0 30px 70px -20px rgba(0,0,0,.6), inset 6px 0 0 rgba(255,255,255,.06)}
 .cover.open .cover-leaf{transform:rotateY(-105deg); opacity:0}
 .cv-top{display:flex; justify-content:space-between; align-items:baseline; font:600 12px/1 var(--f-mono); letter-spacing:.2em; text-transform:uppercase}
-.cv-brand{opacity:.7}
+.cv-brand{display:inline-flex; align-items:center; gap:10px; font:800 26px/1 var(--f-display); letter-spacing:-.03em; text-transform:none}
+.cv-brand svg{width:34px; height:34px; border-radius:8px; box-shadow:0 0 0 1px rgba(255,255,255,.18)}
+.cv-brand i{font-style:normal; color:#ff6b5e}
 .cv-year{font:800 clamp(56px,18vw,120px)/.8 var(--f-display); letter-spacing:-.05em; opacity:1}
 .cv-top{flex-direction:column; align-items:flex-start; gap:10px}
 .cv-hello{font:800 clamp(26px,7vw,40px)/1.05 var(--f-display); letter-spacing:-.02em}
@@ -441,7 +443,7 @@ body.locked .unlock.show{opacity:1; pointer-events:auto}
 
 <div class="cover" id="cover" hidden>
   <div class="cover-leaf" id="coverLeaf">
-    <div class="cv-top"><span class="cv-year" id="cvYear"></span><span class="cv-brand">Agenda</span></div>
+    <div class="cv-top"><span class="cv-year" id="cvYear"></span><span class="cv-brand" aria-label="Memi"><svg viewBox="0 0 100 100" aria-hidden="true"><rect width="100" height="100" rx="23" fill="#14171c"/><path d="M25 75V43M25 55C25 47 29.5 43 34.5 43C39.5 43 42 47 42 53V75M42 55C42 47 46.5 43 51.5 43C56.5 43 59 47 59 53V75" stroke="#fff" stroke-width="10.5" fill="none" stroke-linejoin="round"/><path d="M69 0H82V47L75.5 40.5L69 47Z" fill="#e8382f"/></svg><span>mem<i>i</i></span></span></div>
     <div class="cv-hello" id="cvHello"></div>
     <div class="cv-date" id="cvDate"></div>
     <div class="cv-cols"><section><h3>Oggi</h3><ul id="cvToday"></ul></section><section><h3>Domani</h3><ul id="cvTomorrow"></ul></section></div>
@@ -475,7 +477,7 @@ body.locked .unlock.show{opacity:1; pointer-events:auto}
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.js"></script>
-<script src="/app.js?v=15"></script>
+<script src="/app.js?v=16"></script>
 
 <script>
 if('serviceWorker' in navigator){addEventListener('load',()=>navigator.serviceWorker.register('/sw.js').catch(()=>{}))}
