@@ -288,7 +288,7 @@ new MutationObserver(rd).observe(root,{attributes:true,attributeFilter:['data-th
 
 // ---- Avvisi ----
 const toastEl=document.getElementById('toast'), toastMsg=document.getElementById('toastMsg'), toastBtn=document.getElementById('toastBtn'); let toastT;
-function toast(html,action,ms){toastMsg.innerHTML=html; toastBtn.hidden=!action; toastBtn.onclick=()=>{toastEl.classList.add('hide'); action&&action()};
+function toast(html,action,ms){toastMsg.innerHTML=html; toastBtn.hidden=!action; toastBtn.textContent='Annulla'; toastBtn.onclick=()=>{toastEl.classList.add('hide'); action&&action()};
   toastEl.classList.remove('hide'); clearTimeout(toastT); toastT=setTimeout(()=>toastEl.classList.add('hide'),ms||6000)}
 
 // ---- Interpretazione della frase ----
@@ -396,7 +396,7 @@ function addEntry(p){
   if(sameCur) show(); else if(!flip){goTo(ti); setTimeout(show,(parseFloat(getComputedStyle(root).getPropertyValue('--dur'))||0)*1000+120)}
   const when=`${GG[p.date.getDay()]} ${p.date.getDate()} ${MM[p.date.getMonth()].toLowerCase()}${p.hour!==null?`, ore ${String(p.hour).padStart(2,'0')}:${String(p.minute||0).padStart(2,'0')}`:', nelle note'}`;
   const alTxt=p.al===undefined?'':slot==='n'?' · per l\'avviso serve un orario':(p.al?` · avviso ${remLabel(p.al)} prima`:" · avviso all'ora esatta");
-  hist.when=when+alTxt; voiceHist.push(hist); say(`Segnato: ${p.text}. ${when.replace(', nelle note',', nelle note del giorno')}`+(alTxt?'. '+alTxt.replace(' · ',''):'')+(p.warn?'. '+p.warn:''));
+  hist.when=when+alTxt; voiceHist.push(hist); if(p.al!==undefined&&slot!=='n') warnPush(); say(`Segnato: ${p.text}. ${when.replace(', nelle note',', nelle note del giorno')}`+(alTxt?'. '+alTxt.replace(' · ',''):'')+(p.warn?'. '+p.warn:''));
   toast(`<span>Segnato: ${esc(p.text)}<small>${esc(when+alTxt)}${p.warn?' · '+esc(p.warn):''}</small></span>`,restore,p.warn?9000:6000);
 }
 function esc(s){return String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]))}
@@ -883,13 +883,18 @@ if(sb) sb.auth.onAuthStateChange((ev,session)=>{
   const was=user&&user.id; user=session?session.user:null; updateDot(); renderAccount(); renderPush();
   if(user&&user.id!==was){
     if(!localStorage.getItem('agenda-pull-'+user.id)) for(const k of Object.keys(store)){const d=store[k]; if(k===META||!/\(esempio/.test(JSON.stringify(d.h||{}))) dirty.add(k)}
-    syncNow(); if(ev==='SIGNED_IN') toast(`Accesso fatto: ${esc(user.email||'')}. Sincronizzo l'agenda…`,null,3500)}
+    syncNow().then(()=>syncReminders(futureKeys())); if(ev==='SIGNED_IN') toast(`Accesso fatto: ${esc(user.email||'')}. Sincronizzo l'agenda…`,null,3500)}
 });
 addEventListener('online',()=>{updateDot(); syncNow()}); addEventListener('offline',updateDot);
 document.addEventListener('visibilitychange',()=>{ if(document.visibilityState==='visible') syncNow() });
 setInterval(()=>{ if(document.visibilityState==='visible') syncNow() },60000);
 
 // ---- Promemoria e notifiche ----
+async function pushReady(){ try{ if(!sb||!user||!('Notification' in window)||Notification.permission!=='granted') return false; const reg=await navigator.serviceWorker.ready; return !!(await reg.pushManager.getSubscription()) }catch(e){return false} }
+function warnPush(){ pushReady().then(ok=>{ if(ok) return;
+  const why=!user?'Per ricevere l\'avviso devi prima entrare con il tuo account':'Per ricevere l\'avviso devi attivare le notifiche su questo telefono';
+  setTimeout(()=>{ toast(`<span>${why}<small>Tocca «Imposta ora»: ci vuole un minuto</small></span>`,()=>document.getElementById('setBtn').click(),9000); toastBtn.textContent='Imposta ora';
+    say(why+'. Apri le impostazioni.') },2600) }) }
 function remLabel(m){return m>=1440?(m===1440?'1 giorno':(m/1440)+' giorni'):m>=60?(m===60?'1 ora':(m/60)+' ore'):m+' minuti'}
 // avviso del singolo impegno: -1 nessuno, 0 all'ora esatta, n minuti prima; se non impostato vale l'impostazione generale
 function alertFor(d,sl){const v=d.al&&d.al[sl]; if(v!==undefined&&v!==null) return v<0?null:v; return pref.remind>0?pref.remind:null}
@@ -919,7 +924,7 @@ function openAlertMenu(sh,h,anchor){
   alMenu.onclick=e=>{const b=e.target.closest('[data-al]'); if(!b) return; const val=b.dataset.al;
     sh.data.al=sh.data.al||{}; if(val==='def') delete sh.data.al[h]; else sh.data.al[h]=+val; commit(sh); bellFor(sh,h); alMenu.hidden=true;
     const eff=alertFor(sh.data,h);
-    toast(eff===null?'Nessun avviso per questo impegno':`Ti avviso ${eff?remLabel(eff)+' prima':"all'ora esatta"}`+((!user||Notification.permission!=='granted')?'<small>Per ricevere gli avvisi entra e attiva le notifiche in ⚙ Impostazioni</small>':''),null,3500)};
+    toast(eff===null?'Nessun avviso per questo impegno':`Ti avviso ${eff?remLabel(eff)+' prima':"all'ora esatta"}`,null,2500); if(eff!==null) warnPush()};
 }
 document.addEventListener('pointerdown',e=>{ if(!alMenu.hidden&&!e.target.closest('#alMenu')) alMenu.hidden=true },true);
 function futureKeys(){const t=keyOf(T0); return Object.keys(store).filter(k=>k!==META&&k>=t)}
@@ -959,7 +964,7 @@ pushBtn&&pushBtn.addEventListener('click',async()=>{
   }catch(e){toast('Non sono riuscito ad attivare le notifiche su questo telefono.',null,3500)}
   renderPush();
 });
-remSel&&remSel.addEventListener('change',()=>{pref.remind=+remSel.value; savePref(); syncReminders(futureKeys()); if(cur) decorate(cur)});
+remSel&&remSel.addEventListener('change',()=>{pref.remind=+remSel.value; savePref(); syncReminders(futureKeys()); if(cur) decorate(cur); renderPush()});
 if('serviceWorker' in navigator) navigator.serviceWorker.addEventListener('message',ev=>{const d=ev.data||{}; if(d.type==='goto'&&d.day){closeCover(true); goTo(idxOf(keyDate(d.day)))}});
 
 // ---- Impostazioni ----
